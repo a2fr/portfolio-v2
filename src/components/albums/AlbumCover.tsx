@@ -90,6 +90,14 @@ function breakTitle(title: string, max = 13): string[] {
   return lines;
 }
 
+/**
+ * Server (Node) and browser engines can disagree on the last digits of
+ * Math.sin / Math.hypot, which breaks hydration. Round computed geometry.
+ */
+function round(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 function Artwork({ cover }: { cover: CoverArt }): ReactNode {
   const { ink, accent } = cover;
 
@@ -128,8 +136,8 @@ function Artwork({ cover }: { cover: CoverArt }): ReactNode {
     // N7 / EDF — test signals: a waveform and a DTMF keypad.
     case "signal": {
       const bars = Array.from({ length: 30 }, (_, i) => {
-        const h = 6 + Math.abs(Math.sin(i * 0.7) * 16 + Math.sin(i * 1.9) * 8);
-        return { x: 8 + i * 2.8, h };
+        const h = round(6 + Math.abs(Math.sin(i * 0.7) * 16 + Math.sin(i * 1.9) * 8));
+        return { x: round(8 + i * 2.8), h };
       });
       return (
         <g>
@@ -137,7 +145,7 @@ function Artwork({ cover }: { cover: CoverArt }): ReactNode {
             <rect
               key={x}
               x={x}
-              y={50 - h / 2}
+              y={round(50 - h / 2)}
               width="1.3"
               height={h}
               rx="0.6"
@@ -214,7 +222,7 @@ function Artwork({ cover }: { cover: CoverArt }): ReactNode {
           const x = 8 + col * 6.5;
           const y = 8 + row * 6.5;
           const d = Math.hypot(x - 58, y - 44);
-          dots.push({ x, y, r: Math.max(0.35, 2.6 - d / 14) });
+          dots.push({ x, y, r: round(Math.max(0.35, 2.6 - d / 14)) });
         }
       }
       return (
