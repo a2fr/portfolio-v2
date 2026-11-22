@@ -1,49 +1,37 @@
-export interface ProfileLink {
-  label: string;
-  handle: string;
-  href: string;
-}
+import { todo, type Note } from "./note";
 
-export interface Genre {
-  name: string;
-  instruments: string[];
+export interface EducationEntry {
+  school: Note;
+  degree: Note;
+  period: Note;
+  detail: Note;
 }
 
 export const profile = {
   name: "Alan Fresco",
-  initials: "AF",
-  title: "Software Engineer",
-  specialty: "Backend & Full-Stack",
-  status: "Open to full-time software engineering roles",
-  /** Short placeholder bio — to be refined. */
-  bio: [
-    "I’m a software engineer focused on backend and full-stack development. I like building complete products — from the database and the API to the interface people actually use.",
-    "My work so far spans a restaurant SaaS running with a real pilot, XR interaction development, industrial test automation, desktop tooling, mobile and computer-vision experiments.",
-  ],
-  /** Secondary signals, presented as sonic influences. */
-  influences: [
-    "Product building",
-    "Creative engineering",
-    "Interactive systems",
-    "Automation",
-    "XR",
-    "Mobile",
-    "Computer vision",
-  ],
+  role: "Computer engineer",
+  fields: ["AI", "Full-stack", "Software"],
+  intro:
+    "Computer engineer working across AI, full-stack and software. Before I write or prompt anything, I find the real problem, look at what already exists, and plan the work around the time, budget and team available.",
   links: [
-    { label: "GitHub", handle: "a2fr", href: "https://github.com/a2fr" },
-    { label: "LinkedIn", handle: "alan-fresco", href: "https://www.linkedin.com/in/alan-fresco/" },
-  ] satisfies ProfileLink[],
-  /** Not published yet — rendered as "coming soon", never as a link. */
-  resumeUrl: null as string | null,
+    { label: "GitHub", href: "https://github.com/a2fr" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/alan-fresco/" },
+  ],
+  /** Not published yet. Rendered as a placeholder until set. */
   email: null as string | null,
-  /** Skills grouped as genres; instruments all come from the discography. */
-  genres: [
-    { name: "Backend & Data", instruments: ["PostgreSQL", "Supabase", "Python", "Authentication", "Realtime", "Stripe"] },
-    { name: "Front-end & Product", instruments: ["Angular", "TypeScript", "Responsive UX", "Electron.js"] },
-    { name: "XR & Interactive", instruments: ["Godot", "OpenXR", "Unity", "C#", "Hand tracking"] },
-    { name: "Automation & Systems", instruments: ["Linux", "Modbus", "MQTT", "DTMF", "ROS", "Azure DevOps"] },
-    { name: "Mobile", instruments: ["Kotlin", "Android"] },
-    { name: "Computer Vision", instruments: ["Python", "Image processing", "Algorithms"] },
-  ] satisfies Genre[],
+  resumeUrl: null as string | null,
+  education: [
+    {
+      school: todo("Engineering school name"),
+      degree: todo("Degree and specialisation"),
+      period: todo("Years"),
+      detail: todo("One line: main subjects, or what this school taught you about working as an engineer"),
+    },
+    {
+      school: todo("Previous step (preparatory classes, bachelor, exchange)"),
+      degree: todo("Degree or programme"),
+      period: todo("Years"),
+      detail: todo("One line on what you took from it"),
+    },
+  ] satisfies EducationEntry[],
 };
