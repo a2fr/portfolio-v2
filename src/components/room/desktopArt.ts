@@ -9,6 +9,48 @@ export const DOCK_COLOR = "rgba(24, 12, 28, 0.55)";
 /** Top bar height, dock width, bar text size and bar side padding of the full-page desktop, in CSS pixels. */
 export const BAR_PX = 28;
 export const DOCK_PX = 64;
+/** Dock launcher icons: size, gap above the first one, and space between them, in CSS pixels. */
+export const DOCK_ICON_PX = 44;
+export const DOCK_ICON_TOP_PX = 10;
+export const DOCK_ICON_GAP_PX = 16;
+
+/** Apps pinned to the dock, top to bottom. Their icons are drawn on the 3D display too. */
+export const DOCK_APPS = [
+  { id: "alten", name: "Alten Labs", icon: "/apps/alten.png" },
+  { id: "edf", name: "EDF", icon: "/apps/edf.png" },
+  { id: "groupe-fd", name: "Groupe FD", icon: "/apps/groupe-fd.png" },
+  { id: "piloteat", name: "Piloteat", icon: "/apps/piloteat.png" },
+] as const;
+export type DockAppId = (typeof DOCK_APPS)[number]["id"];
+
+/** Index of the first dock app after the separator line (the experiences above it, the personal project below). */
+export const DOCK_SEPARATOR_BEFORE = DOCK_APPS.length - 1;
+/** Extra space the separator adds between its two icons, and the separator line's width and thickness, in CSS pixels. */
+const DOCK_SEPARATOR_EXTRA_PX = 12;
+const DOCK_SEPARATOR_WIDTH_PX = 28;
+const DOCK_SEPARATOR_THICKNESS_PX = 1;
+export const DOCK_SEPARATOR_COLOR = "rgba(255, 255, 255, 0.22)";
+
+/** Box of the dock icon at `index`, in CSS pixels of the full-page desktop. */
+export function dockIconBox(index: number) {
+  const x = (DOCK_PX - DOCK_ICON_PX) / 2;
+  const extra = index >= DOCK_SEPARATOR_BEFORE ? DOCK_SEPARATOR_EXTRA_PX : 0;
+  const y = BAR_PX + DOCK_ICON_TOP_PX + index * (DOCK_ICON_PX + DOCK_ICON_GAP_PX) + extra;
+  return { x, y, size: DOCK_ICON_PX };
+}
+
+/** Box of the thin line separating the dock's two groups, in CSS pixels of the full-page desktop. */
+export function dockSeparatorBox() {
+  const above = dockIconBox(DOCK_SEPARATOR_BEFORE - 1);
+  const below = dockIconBox(DOCK_SEPARATOR_BEFORE);
+  const middle = (above.y + above.size + below.y) / 2;
+  return {
+    x: (DOCK_PX - DOCK_SEPARATOR_WIDTH_PX) / 2,
+    y: middle - DOCK_SEPARATOR_THICKNESS_PX / 2,
+    width: DOCK_SEPARATOR_WIDTH_PX,
+    height: DOCK_SEPARATOR_THICKNESS_PX,
+  };
+}
 const BAR_TEXT_PX = 13;
 const BAR_PAD_PX = 12;
 
@@ -121,6 +163,7 @@ export function desktopImageSrc(width: number, height: number, view: DesktopView
   const barBottom = view.y + BAR_PX * view.scale;
   const barMiddle = view.y + (BAR_PX * view.scale) / 2;
   const dockRight = view.x + DOCK_PX * view.scale;
+  const separator = dockSeparatorBox();
   const font = `font-family="Ubuntu, system-ui, sans-serif" font-size="${BAR_TEXT_PX * view.scale}" fill="#fff" dominant-baseline="central"`;
   const text = `${font} font-weight="600"`;
   const status = items
@@ -137,6 +180,7 @@ export function desktopImageSrc(width: number, height: number, view: DesktopView
   const body = `
 <svg x="${view.x}" y="${view.y}" width="${view.width}" height="${view.height}" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" overflow="visible">${wallpaperMarkup()}</svg>
 <rect y="${barBottom}" width="${dockRight}" height="${height - barBottom}" fill="${DOCK_COLOR}"/>
+<rect x="${view.x + separator.x * view.scale}" y="${view.y + separator.y * view.scale}" width="${separator.width * view.scale}" height="${separator.height * view.scale}" rx="${(separator.height * view.scale) / 2}" fill="${DOCK_SEPARATOR_COLOR}"/>
 <rect width="${width}" height="${barBottom}" fill="${BAR_COLOR}"/>
 <text x="${view.x + BAR_PAD_PX * view.scale}" y="${barMiddle}" ${text}>${escapeXml(name)}</text>
 <text x="${view.x + view.width / 2}" y="${barMiddle}" text-anchor="middle" xml:space="preserve" ${text}>${clock}</text>

@@ -188,3 +188,25 @@ html[data-intro="play"] #site {
     radial-gradient(ellipse 90% 70% at 50% 35%, #1b1912 0%, #100f0b 45%, #070705 80%, #030302 100%);
   background-color: #050504;
 }
+
+/* Education timeline: the tassel at the end of the cap's cord swings gently from its knot. */
+.tassel-sway {
+  transform-origin: 50% 0;
+  animation: tassel-sway 4.5s ease-in-out infinite;
+}
+
+@keyframes tassel-sway {
+  0%,
+  100% {
+    rotate: -4deg;
+  }
+  50% {
+    rotate: 4deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tassel-sway {
+    animation: none;
+  }
+}

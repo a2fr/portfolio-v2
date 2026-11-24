@@ -209,9 +209,18 @@ export function Intro() {
     };
     let staring = false;
 
-    const start = performance.now();
+    // The room behind builds its shaders in its first two frames, which freezes the page for a moment.
+    // The clock starts once that is over, so the reveal does not stutter as it begins.
+    let start = 0;
+    let warmUp = 2;
 
     const frame = (now: number) => {
+      if (warmUp > 0) {
+        warmUp--;
+        start = now;
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const ms = Math.min(now - start, ZOOM_END);
       const time = ms / DURATION;
 
@@ -247,8 +256,10 @@ export function Intro() {
       logo.style.transform = `translate(${(x - eyeX).toFixed(2)}px,${(y - eyeY).toFixed(2)}px) scale(${scale.toFixed(4)})`;
 
       // The pupil is a window onto the site, which sits in it, centred, at the pupil's scale.
+      // The masks are in place from the first frame, while the window is still shut: setting them up costs the
+      // graphics card a few frames, and those must not be the ones where the zoom starts.
       const open = span(ms, REVEAL);
-      if (open > 0) {
+      {
         const radius = pupilRadius * scale;
         const hole = `radial-gradient(circle at ${x.toFixed(2)}px ${y.toFixed(2)}px, rgba(0,0,0,${(1 - open).toFixed(3)}) ${Math.max(radius - 0.75, 0).toFixed(2)}px, #000 ${radius.toFixed(2)}px)`;
         overlay.style.setProperty("-webkit-mask-image", hole);

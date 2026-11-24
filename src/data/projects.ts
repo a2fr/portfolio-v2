@@ -1,23 +1,24 @@
+import type { Localized } from "@/i18n/language";
 import { fact, todo, type Note } from "./note";
 
 export interface Option {
-  name: string;
+  name: string | Localized;
   verdict: "chosen" | "rejected";
-  why: string;
+  why: string | Localized;
   draft?: boolean;
 }
 
 export interface Project {
   slug: string;
-  title: string;
-  /** The problem in one line, shown on the home page. */
-  tagline: string;
+  title: Localized;
+  /** The problem in one line. */
+  tagline: Localized;
   role: Note;
   period: Note;
   team: Note;
   result: Note;
   stack: string[];
-  links: { label: string; href: string }[];
+  links: { label: Localized; href: string }[];
   understand: { problem: Note; constraints: Note[] };
   research: { existing: Note; options: Option[] };
   plan: { decision: Note; steps: Note[] };
@@ -50,14 +51,26 @@ const draftOptions = (topic: string): Option[] => [
 export const projects: Project[] = [
   {
     slug: "piloteat",
-    title: "Piloteat",
-    tagline: "A restaurant SaaS, running today with a real pilot restaurant: Kashmir Lounge.",
-    role: fact("Co-founder and full-stack engineer"),
-    period: fact("Jul 2026 to present"),
+    title: { en: "Piloteat", fr: "Piloteat", fil: "Piloteat" },
+    tagline: { en: "A restaurant SaaS, running today with a real pilot restaurant: Kashmir Lounge.", fr: "Un SaaS pour la restauration, en service aujourd'hui avec un vrai restaurant pilote : Kashmir Lounge.", fil: "Isang SaaS para sa mga restawran, gumagana na ngayon kasama ang isang tunay na pilot na restawran: Kashmir Lounge." },
+    role: fact({
+      en: "Co-founder and full-stack engineer",
+      fr: "Cofondateur et ingénieur full-stack",
+      fil: "Co-founder at full-stack engineer",
+    }),
+    period: fact({
+      en: "Jun 2026 to present",
+      fr: "Depuis juin 2026",
+      fil: "Mula Hunyo 2026 hanggang ngayon",
+    }),
     team: todo("Team size and who does what"),
-    result: fact("Deployed and publicly reachable for the pilot"),
+    result: fact({
+      en: "Deployed and publicly reachable for the pilot",
+      fr: "Déployé et accessible publiquement pour le pilote",
+      fil: "Naka-deploy at bukas sa publiko para sa pilot",
+    }),
     stack: ["Angular", "TypeScript", "Supabase", "PostgreSQL", "Stripe", "Vercel"],
-    links: [{ label: "Kashmir Lounge live pilot", href: "https://kashmir-lounge.vercel.app" }],
+    links: [{ label: { en: "Kashmir Lounge live pilot", fr: "Kashmir Lounge, le pilote en ligne", fil: "Kashmir Lounge, ang live na pilot" }, href: "https://kashmir-lounge.piloteat.com" }],
     understand: {
       problem: todo("What was Kashmir Lounge struggling with before Piloteat? Who felt it: the owner, the staff, the customers?"),
       constraints: [
@@ -71,7 +84,11 @@ export const projects: Project[] = [
       options: draftOptions("the backend and hosting"),
     },
     plan: {
-      decision: fact("Supabase on PostgreSQL for data, authentication and realtime, with Stripe for payments and an Angular front end."),
+      decision: fact({
+        en: "Supabase on PostgreSQL for data, authentication and realtime, with Stripe for payments and an Angular front end.",
+        fr: "Supabase sur PostgreSQL pour les données, l'authentification et le temps réel, avec Stripe pour les paiements et un front-end Angular.",
+        fil: "Supabase sa PostgreSQL para sa data, authentication at real time, kasama ang Stripe para sa mga bayad at front end sa Angular.",
+      }),
       steps: [
         todo("Milestones: what shipped first, what waited"),
         todo("Roles: who owned product, design, code, the relationship with the restaurant"),
@@ -79,7 +96,11 @@ export const projects: Project[] = [
       ],
     },
     build: {
-      summary: fact("I work across the whole product: the Angular and TypeScript front end, the Supabase and PostgreSQL back end, authentication, realtime features and responsive interfaces."),
+      summary: fact({
+        en: "I work across the whole product: the Angular and TypeScript front end, the Supabase and PostgreSQL back end, authentication, realtime features and responsive interfaces.",
+        fr: "Je travaille sur l'ensemble du produit : le front-end en Angular et TypeScript, le back-end Supabase et PostgreSQL, l'authentification, les fonctionnalités temps réel et les interfaces responsives.",
+        fil: "Hawak ko ang buong produkto: ang front end sa Angular at TypeScript, ang back end sa Supabase at PostgreSQL, ang authentication, ang mga real-time na feature at ang mga responsive na interface.",
+      }),
       hardParts: [
         todo("One hard technical point and how you solved it (realtime consistency, payments, access rules)"),
         todo("A second one"),
@@ -91,16 +112,28 @@ export const projects: Project[] = [
         todo("Manual tests: how you checked with the restaurant before release"),
         todo("Security: access rules, payment safety, what you hardened"),
       ],
-      outcome: fact("Piloteat runs with a real restaurant pilot, Kashmir Lounge. The pilot is deployed and publicly reachable."),
+      outcome: fact({
+        en: "Piloteat runs with a real restaurant pilot, Kashmir Lounge. The pilot is deployed and publicly reachable.",
+        fr: "Piloteat tourne avec un vrai restaurant pilote, Kashmir Lounge. Le pilote est déployé et accessible publiquement.",
+        fil: "Gumagana ang Piloteat kasama ang isang tunay na pilot na restawran, ang Kashmir Lounge. Naka-deploy ang pilot at bukas ito sa publiko.",
+      }),
       next: todo("What you would do differently, and what the pilot taught you"),
     },
   },
   {
     slug: "n7-consulting-edf",
-    title: "EDF alarm-test automation",
-    tagline: "Automate the testing of industrial alarm systems across Modbus, MQTT and telephony.",
-    role: fact("Python developer and software consultant, via N7 Consulting"),
-    period: fact("Oct 2024 to Mar 2025"),
+    title: { en: "EDF alarm-test automation", fr: "Automatisation des tests d'alarme EDF", fil: "Automation ng alarm test ng EDF" },
+    tagline: { en: "Automate the testing of industrial alarm systems across Modbus, MQTT and telephony.", fr: "Automatiser les tests de systèmes d'alarme industriels, via Modbus, MQTT et la téléphonie.", fil: "Pag-automate ng mga test ng mga industrial na alarm system, gamit ang Modbus, MQTT at telepono." },
+    role: fact({
+      en: "Python developer and software consultant, via N7 Consulting",
+      fr: "Développeur Python et consultant logiciel, via N7 Consulting",
+      fil: "Python developer at software consultant, sa pamamagitan ng N7 Consulting",
+    }),
+    period: fact({
+      en: "Oct 2024 to Mar 2025",
+      fr: "Oct. 2024 – mars 2025",
+      fil: "Okt. 2024 – Mar. 2025",
+    }),
     team: todo("Team size and your part in it"),
     result: todo("Result to add: time saved, tests covered, adoption by EDF"),
     stack: ["Python", "Linux", "Modbus", "MQTT", "DTMF"],
@@ -126,7 +159,11 @@ export const projects: Project[] = [
       ],
     },
     build: {
-      summary: fact("Python automation on Linux that tests industrial alarm systems through Modbus, MQTT and telephony workflows, including DTMF signalling."),
+      summary: fact({
+        en: "Python automation on Linux that tests industrial alarm systems through Modbus, MQTT and telephony workflows, including DTMF signalling.",
+        fr: "Une automatisation Python sous Linux qui teste des systèmes d'alarme industriels via Modbus, MQTT et des scénarios téléphoniques, signalisation DTMF comprise.",
+        fil: "Python automation sa Linux na tumetest ng mga industrial na alarm system gamit ang Modbus, MQTT at mga daloy ng telepono, kasama ang DTMF signalling.",
+      }),
       hardParts: [
         todo("One hard technical point (timing, hardware access, flaky signals) and how you solved it"),
         todo("A second one"),
@@ -144,10 +181,18 @@ export const projects: Project[] = [
   },
   {
     slug: "alten-labs",
-    title: "Alten Labs digital twin",
-    tagline: "A digital twin of the Alten labs that people can walk through and use in VR and mixed reality.",
-    role: fact("XR software developer intern"),
-    period: fact("Sep 2025 to Mar 2026"),
+    title: { en: "Alten Labs digital twin", fr: "Jumeau numérique des Alten Labs", fil: "Digital twin ng Alten Labs" },
+    tagline: { en: "A digital twin of the Alten labs that people can walk through and use in VR and mixed reality.", fr: "Un jumeau numérique des labs d'Alten, que l'on peut parcourir et utiliser en VR et en réalité mixte.", fil: "Isang digital twin ng mga lab ng Alten na maaaring lakarin at gamitin sa VR at mixed reality." },
+    role: fact({
+      en: "XR software developer intern",
+      fr: "Stagiaire développeur logiciel XR",
+      fil: "XR software developer intern",
+    }),
+    period: fact({
+      en: "Sep 2025 to Mar 2026",
+      fr: "Sept. 2025 – mars 2026",
+      fil: "Set. 2025 – Mar. 2026",
+    }),
     team: todo("Team size and your part in it"),
     result: todo("Result to add: what the twin lets Alten do now"),
     stack: ["Godot", "OpenXR", "ROS", "Azure DevOps"],
@@ -165,15 +210,27 @@ export const projects: Project[] = [
       options: draftOptions("locomotion and interaction"),
     },
     plan: {
-      decision: fact("Godot with the OpenXR standard, with hand tracking, teleportation and direct grabbing as the interaction model."),
+      decision: fact({
+        en: "Godot with the OpenXR standard, with hand tracking, teleportation and direct grabbing as the interaction model.",
+        fr: "Godot avec le standard OpenXR, avec le suivi des mains, la téléportation et la saisie directe comme modèle d'interaction.",
+        fil: "Godot gamit ang OpenXR standard, na may hand tracking, teleportation at direktang paghawak bilang paraan ng interaksyon.",
+      }),
       steps: [
         todo("Milestones: prototype, first usable scene, final demo"),
         todo("Roles in the team"),
-        fact("Collaboration and delivery organised through Azure DevOps."),
+        fact({
+          en: "Collaboration and delivery organised through Azure DevOps.",
+          fr: "Collaboration et livraisons organisées avec Azure DevOps.",
+          fil: "Ang kolaborasyon at paghahatid ay inayos sa pamamagitan ng Azure DevOps.",
+        }),
       ],
     },
     build: {
-      summary: fact("VR and mixed-reality interactions built with Godot and OpenXR: hand tracking, teleportation-based movement and direct object manipulation, in a digital-twin and ROS context."),
+      summary: fact({
+        en: "VR and mixed-reality interactions built with Godot and OpenXR: hand tracking, teleportation-based movement and direct object manipulation, in a digital-twin and ROS context.",
+        fr: "Des interactions en VR et en réalité mixte construites avec Godot et OpenXR : suivi des mains, déplacement par téléportation et manipulation directe des objets, dans un contexte de jumeau numérique et de ROS.",
+        fil: "Mga interaksyon sa VR at mixed reality na binuo gamit ang Godot at OpenXR: hand tracking, paggalaw sa pamamagitan ng teleportation at direktang paghawak ng mga bagay, sa konteksto ng digital twin at ROS.",
+      }),
       hardParts: [
         todo("One hard technical point (hand-tracking reliability, comfort, ROS link) and how you solved it"),
         todo("A second one"),
@@ -191,8 +248,8 @@ export const projects: Project[] = [
   },
   {
     slug: "groupe-fd-assurances",
-    title: "Insurance broker automation",
-    tagline: "Semi-automate the simple but time-consuming tasks of an insurance brokerage.",
+    title: { en: "Insurance broker automation", fr: "Automatisation pour un courtier en assurances", fil: "Automation para sa isang insurance broker" },
+    tagline: { en: "Semi-automate the simple but time-consuming tasks of an insurance brokerage.", fr: "Semi-automatiser les tâches simples mais chronophages d'un cabinet de courtage en assurances.", fil: "Bahagyang pag-automate ng mga simple pero matagal na gawain ng isang insurance brokerage." },
     role: todo("Your title during the internship"),
     period: todo("Dates to add"),
     team: todo("Team size and who you worked with"),
@@ -212,7 +269,11 @@ export const projects: Project[] = [
       options: draftOptions("a small firm with no IT team"),
     },
     plan: {
-      decision: fact("A desktop application built with Electron.js, so the brokers keep control of each step while the repetitive part is automated."),
+      decision: fact({
+        en: "A desktop application built with Electron.js, so the brokers keep control of each step while the repetitive part is automated.",
+        fr: "Une application de bureau construite avec Electron.js, pour que les courtiers gardent la main sur chaque étape pendant que la partie répétitive est automatisée.",
+        fil: "Isang desktop application na binuo gamit ang Electron.js, para hawak pa rin ng mga broker ang bawat hakbang habang naka-automate ang paulit-ulit na bahagi.",
+      }),
       steps: [
         todo("Milestones: which task you automated first and why"),
         todo("How you collected feedback from the brokers"),
@@ -220,7 +281,11 @@ export const projects: Project[] = [
       ],
     },
     build: {
-      summary: fact("A desktop application built with Electron.js for business tooling and automation, in an insurance SME."),
+      summary: fact({
+        en: "A desktop application built with Electron.js for business tooling and automation, in an insurance SME.",
+        fr: "Une application de bureau construite avec Electron.js pour l'outillage métier et l'automatisation, dans une PME d'assurance.",
+        fil: "Isang desktop application na binuo gamit ang Electron.js para sa mga tool sa negosyo at automation, sa isang maliit na kompanya ng insurance.",
+      }),
       hardParts: [
         todo("One hard technical point and how you solved it"),
         todo("A second one"),

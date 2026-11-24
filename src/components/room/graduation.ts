@@ -71,12 +71,14 @@ export function buildGraduationCap() {
  * a loose spiral of thin paper (layers visible in the open ends, the sheet's free edge a small step on the
  * outside), flaring slightly at the ends and pinched in the middle by a wide gold satin ribbon: a band, two flat
  * loops along the roll, two V-cut tails down its sides, and a red wax seal pressed on top where they meet.
- * `phase` turns the spiral so two rolls side by side don't show their seam in the same place.
+ * `phase` turns the spiral so two rolls side by side don't show their seam in the same place; `seal` picks
+ * gold satin with red wax ("classic") or their opposites, blue satin with green wax ("inverse").
  */
-export function buildDiploma(length = 0.2, radius = 0.019, phase = 0) {
+export function buildDiploma(length = 0.2, radius = 0.019, phase = 0, seal: DiplomaSeal = "classic") {
+  const colours = SEAL_COLOURS[seal];
   const group = new THREE.Group();
   const satin = new THREE.MeshStandardMaterial({
-    color: SATIN,
+    color: colours.satin,
     metalness: 0.3,
     roughness: 0.32,
     side: THREE.DoubleSide,
@@ -123,19 +125,24 @@ export function buildDiploma(length = 0.2, radius = 0.019, phase = 0) {
     group.add(new THREE.Mesh(ribbonStrip(tail, onRoll, ribbonWidth * 0.9, true), satin));
   }
 
-  const seal = waxSeal(radius * 0.52);
-  seal.position.y = top + 0.0028;
-  seal.rotation.set(-0.06, 0.4, 0.05); // pressed by hand, not quite square
-  group.add(seal);
+  const wax = waxSeal(radius * 0.52, colours.wax);
+  wax.position.y = top + 0.0028;
+  wax.rotation.set(-0.06, 0.4, 0.05); // pressed by hand, not quite square
+  group.add(wax);
 
   return shadowed(group);
 }
 
-const SATIN = "#f0bb3c";
-const WAX = "#b42a24";
+export type DiplomaSeal = "classic" | "inverse";
 
-/** A blob of red wax pressed flat on top, facing +y: a wobbly rounded disc with a stamped rim and emblem. */
-function waxSeal(radius: number) {
+/** Ribbon satin and wax for each seal; "inverse" takes the complementary hues of "classic". */
+const SEAL_COLOURS: Record<DiplomaSeal, { satin: string; wax: string }> = {
+  classic: { satin: "#f0bb3c", wax: "#b42a24" },
+  inverse: { satin: "#3c71f0", wax: "#24b45a" },
+};
+
+/** A blob of wax pressed flat on top, facing +y: a wobbly rounded disc with a stamped rim and emblem. */
+function waxSeal(radius: number, colour: string) {
   const outline: THREE.Vector2[] = [];
   for (let i = 0; i < 64; i++) {
     const a = (i / 64) * Math.PI * 2;
@@ -161,7 +168,7 @@ function waxSeal(radius: number) {
   geometry.rotateX(-Math.PI / 2); // the stamped face up
 
   const material = new THREE.MeshStandardMaterial({
-    color: WAX,
+    color: colour,
     roughness: 0.42,
     bumpMap: sealStamp(),
     bumpScale: 12,

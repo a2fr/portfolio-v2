@@ -3,17 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { type BarItem, type DesktopView, desktopImageSrc } from "./desktopArt";
+import { type BarItem, DOCK_APPS, type DesktopView, desktopImageSrc, dockIconBox } from "./desktopArt";
 import { buildChair } from "./chair";
-import { buildDiploma, buildGraduationCap } from "./graduation";
+import { buildDiploma, buildGraduationCap, type DiplomaSeal } from "./graduation";
 import { buildPiano } from "./piano";
 import { buildWindowView, seasonOf } from "./windowView";
-import { PAPER_SIZE, buildPaper, buildPen } from "./deskPaper";
+import { PAPER_SIZE, buildPaper, buildPen, buildUsbKey } from "./deskPaper";
 import { box, buildSetup, matte } from "./deskSetup";
 import { PAD_FONTS } from "./padFonts";
-import { A4_ASPECT, ResumePaper } from "./ResumePaper";
+import { A4_ASPECT, ResumePaper, saveResume } from "./ResumePaper";
 import { EducationTimeline } from "./EducationTimeline";
 import { OWNER_NAME, UbuntuDesktop, formatClock } from "./UbuntuDesktop";
+import { type FlagSlot, buildFlagCorner } from "./flags";
+import { buildLetterBox } from "./letterBox";
+import { ContactBox } from "./ContactBox";
+import { LANGS, type Lang, getLanguage, setLanguage, subscribeLanguage, useLanguage } from "@/i18n/language";
+import { strings } from "@/i18n/strings";
+import { useDocumentTitle } from "@/i18n/useDocumentTitle";
 
 const ROOM = 4; // floor side, in metres
 const WALL_HEIGHT = 2.8;
@@ -22,17 +28,43 @@ const SLAB = 0.15; // chessboard floor slab
 const BASE = 0.3; // grey plinth under it
 const FOV = 20;
 const ZOOM_MS = 1700;
+/** One click of the pen: the plunger goes in past the catch, the tip flips, the plunger springs back. */
+const PEN_CLICK_MS = 380;
+/** How far past its open rest the plunger is pushed at the bottom of a click, in plunger travels. */
+const PEN_PRESS_DEPTH = -0.45;
+/** Part of the click spent pushing the plunger in; the rest is it springing back. */
+const PEN_PRESS_SHARE = 0.4;
 
 type Mode = "room" | "entering" | "inside" | "leaving";
-/** What the camera dives into: the monitor, the CV lying on the desk, or the graduation cap on the shelf. */
-type Focus = "screen" | "paper" | "diplomas";
+/**
+ * What the camera dives into: the monitor, the CV lying on the desk, the graduation cap on the shelf, or the slot
+ * of the letter box on the wall.
+ */
+type Focus = "screen" | "paper" | "diplomas" | "mailbox";
+/** The letter box, high on the left wall towards the back corner: its centre's height and place along the wall. */
+const LETTER_BOX_AT = { y: 2.3, z: 0.62 };
+/** How far in front of the slot the dive ends: close enough that its dark fills any viewport. */
+const SLOT_VIEW_DISTANCE = 0.05;
 /** Where the paper and pen lie, in the setup's frame (x along the desk, +z towards the chair). */
 const PAPER_AT = { x: -1.22, z: 0.04, turn: 0.03 };
 const PEN_AT = { x: -1.46, z: 0.03, turn: -0.12 };
+/** The USB key holding the CV, just right of the sheet (as read in the paper view), plug towards the wall. */
+const USB_AT = { x: PAPER_AT.x + PAPER_SIZE.width / 2 + 0.07, z: 0.1, turn: -0.35 };
 /** The camera comes down onto the paper from a little in front, so the page reads upright. */
 const PAPER_VIEW_TILT = 0.12;
 /** Direction (around y, from +x towards +z) the camera comes at the graduation cap's side from. */
 const CAP_VIEW_TURN = 0.45;
+/** Language buttons for the keyboard, in the order the flags were first shown: Filipino, English, French. */
+const FLAG_ORDER: Lang[] = ["fr", "en", "fil"];
+/**
+ * On the high run of the shelf: the flag stand on the viewer's left, near the ramp, close to the wall; the cup of
+ * spare flags near the far end and out towards the room, so the stand's cloth and the cup's left flag, whose
+ * cloths face each other, never overlap from the room view.
+ */
+const FLAGS_AT = { x: 0.1, z: 2.08, cup: { x: 0.12, z: -0.52 } };
+/** Time for two flags to swap between the cup and the stand. */
+const FLAG_SWAP_MS = 900;
+
 const ROOM_BUTTON = "rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:bg-white";
 
 /** Chessboard floor: 8 x 8 squares of the chair's green and a lighter tint of it, each with faint streaky grain. */
@@ -283,7 +315,7 @@ const LEDGE_PATH: [number, number][] = [
 ];
 
 /**
- * Graduation cap and two rolled diplomas on the shelf's low run (top at y = 1.66, z ≈ 2.52 to 3.3).
+ * Graduation cap and three rolled diplomas on the shelf's low run (top at y = 1.66, z ≈ 2.52 to 3.3).
  * Also returns the cap, whose side the camera dives into.
  */
 function buildShelfDisplay() {
@@ -297,22 +329,25 @@ function buildShelfDisplay() {
   cap.rotation.y = 0.35;
   group.add(cap);
 
-  // Two rolls lying side by side, pointing out of the wall, one slightly askew.
+  // Three rolls lying side by side, pointing out of the wall, a little askew; the last, the baccalauréat and
+  // preparatory classes, has the opposite ribbon and wax colours.
   const radius = 0.019 * scale;
-  for (const [z, turn, phase] of [
-    [3.0, Math.PI / 2 - 0.04, 0.6],
-    [3.08, Math.PI / 2 + 0.12, 2.9],
-  ]) {
-    const diploma = buildDiploma(0.2, 0.019, phase);
+  const rolls: [number, number, number, DiplomaSeal][] = [
+    [3.0, Math.PI / 2 - 0.04, 0.6, "classic"],
+    [3.08, Math.PI / 2 + 0.12, 2.9, "classic"],
+    [3.165, Math.PI / 2 - 0.09, 4.4, "inverse"],
+  ];
+  for (const [z, turn, phase, seal] of rolls) {
+    const diploma = buildDiploma(0.2, 0.019, phase, seal);
     diploma.scale.setScalar(scale); // the bow scales with the roll
     diploma.position.set(0.17, shelfTop + radius * 1.07, z); // rests on its flared ends
     diploma.rotation.y = turn;
     group.add(diploma);
   }
 
-  // Invisible block around the cap and both rolls, so the gaps between them take a click too.
-  const hitArea = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.52), new THREE.MeshBasicMaterial({ visible: false }));
-  hitArea.position.set(0.18, shelfTop + 0.06, 2.87);
+  // Invisible block around the cap and the rolls, so the gaps between them take a click too.
+  const hitArea = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+  hitArea.position.set(0.18, shelfTop + 0.06, 2.91);
   group.add(hitArea);
   return { group, cap, capRadius: 0.07 * scale, capMidHeight: 0.0275 * scale };
 }
@@ -610,6 +645,44 @@ export function Bedroom() {
     scene.add(buildShell());
     const shelf = buildShelfDisplay();
     scene.add(shelf.group);
+    // The current language's flag stands in the stand; the two others lean in a cup, ready to be picked.
+    const flags = buildFlagCorner(FLAGS_AT.cup);
+    flags.group.position.set(FLAGS_AT.x, LEDGE_PATH[2][1], FLAGS_AT.z);
+    scene.add(flags.group);
+    const slotOf = {} as Record<Lang, FlagSlot>;
+    {
+      const spare: FlagSlot[] = ["right", "left"];
+      for (const lang of LANGS) slotOf[lang] = lang === getLanguage() ? "stand" : spare.shift()!;
+      for (const lang of LANGS) {
+        const slot = flags.slots[slotOf[lang]];
+        flags.flags[lang].position.copy(slot.position);
+        flags.flags[lang].quaternion.copy(slot.quaternion);
+      }
+    }
+    // Flags on their way between the cup and the stand: where each started, and how far along it is (0 to 1).
+    const flagMoves = new Map<Lang, { position: THREE.Vector3; quaternion: THREE.Quaternion; lift: number; t: number }>();
+    const moveFlag = (lang: Lang, lift: number) =>
+      flagMoves.set(lang, {
+        position: flags.flags[lang].position.clone(),
+        quaternion: flags.flags[lang].quaternion.clone(),
+        lift,
+        t: 0,
+      });
+    // A new language: its flag rises out of the cup onto the stand, and the stand's flag goes into the gap it left.
+    const swapFlags = () => {
+      const chosen = getLanguage();
+      if (slotOf[chosen] === "stand") return;
+      const previous = LANGS.find((lang) => slotOf[lang] === "stand")!;
+      slotOf[previous] = slotOf[chosen];
+      slotOf[chosen] = "stand";
+      moveFlag(chosen, 0.16);
+      moveFlag(previous, 0.07);
+      dirty = true;
+    };
+    const letterBox = buildLetterBox();
+    letterBox.group.position.set(0, LETTER_BOX_AT.y, LETTER_BOX_AT.z);
+    letterBox.texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    scene.add(letterBox.group);
     const casement = buildWindow();
     scene.add(casement.group);
     // What the window looks out on follows the season; it may move (falling snow).
@@ -623,6 +696,13 @@ export function Bedroom() {
 
     const setup = buildSetup({ padFonts: PAD_FONTS, onRepaint: () => (dirty = true) });
     for (const texture of setup.textures) texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    // The monitor starts with a blank picture, so its shader is built with the rest of the room rather than when
+    // the desktop arrives, a moment into the intro.
+    {
+      const blank = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+      blank.needsUpdate = true;
+      (setup.display.material as THREE.MeshBasicMaterial).map = blank;
+    }
     // Chrome only reads as chrome with something to reflect; the rest of the room keeps its flat lighting.
     const pmrem = new THREE.PMREMGenerator(renderer);
     const reflections = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -648,16 +728,22 @@ export function Bedroom() {
     scene.add(piano.group);
 
     // The CV on the empty end of the desk, with a pen beside it.
-    const paper = buildPaper(OWNER_NAME);
+    const paper = buildPaper(OWNER_NAME, () => (dirty = true));
+    paper.texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
     paper.sheet.position.x = PAPER_AT.x;
     paper.sheet.position.z = PAPER_AT.z;
     paper.sheet.rotation.y = PAPER_AT.turn;
     setup.group.add(paper.sheet);
-    const pen = buildPen();
+    const { pen, pose: posePen } = buildPen();
     pen.position.x = PEN_AT.x;
     pen.position.z = PEN_AT.z;
     pen.rotation.y = PEN_AT.turn;
     setup.group.add(pen);
+    const usbKey = buildUsbKey();
+    usbKey.usb.position.x = USB_AT.x;
+    usbKey.usb.position.z = USB_AT.z;
+    usbKey.usb.rotation.y = USB_AT.turn;
+    setup.group.add(usbKey.usb);
     scene.updateMatrixWorld(true);
 
     // The monitor shows the desktop the zoom lands on. Two pictures of it are kept: one laid out across the
@@ -678,14 +764,32 @@ export function Bedroom() {
           : { ...place, text: el.textContent ?? "", weight: getComputedStyle(el).fontWeight };
       });
 
+    // Dock icons are bitmaps, drawn over the SVG desktop once both have loaded.
+    const dockIcons = DOCK_APPS.map((app) => {
+      const icon = new Image();
+      icon.src = app.icon;
+      return icon.decode().then(
+        () => icon,
+        () => null,
+      );
+    });
+
     const paintLayer = (layer: THREE.Mesh, view: DesktopView, items: BarItem[], request: number) => {
       const image = new Image();
-      image.onload = () => {
+      image.onload = async () => {
+        const icons = await Promise.all(dockIcons);
         if (disposed || request !== screenRequest) return;
         const canvas = document.createElement("canvas");
         canvas.width = texW;
         canvas.height = texH;
-        canvas.getContext("2d")?.drawImage(image, 0, 0, texW, texH);
+        const context = canvas.getContext("2d");
+        context?.drawImage(image, 0, 0, texW, texH);
+        icons.forEach((icon, index) => {
+          if (!icon || !context) return;
+          const box = dockIconBox(index);
+          const size = box.size * view.scale;
+          context.drawImage(icon, view.x + box.x * view.scale, view.y + box.y * view.scale, size, size);
+        });
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -740,13 +844,22 @@ export function Bedroom() {
     capCentre.y += shelf.capMidHeight;
     const capSide = new THREE.Vector3(Math.cos(CAP_VIEW_TURN), 0, Math.sin(CAP_VIEW_TURN));
 
+    // The letter box is entered head-on through its slot, which faces straight into the room.
+    const slotCentre = letterBox.slot.getWorldPosition(new THREE.Vector3());
+
     const far = { position: new THREE.Vector3() };
     const near = {
       screen: new THREE.Vector3(),
       paper: new THREE.Vector3(),
       diplomas: capCentre.clone().addScaledVector(capSide, shelf.capRadius + 0.035),
+      mailbox: slotCentre.clone().add(new THREE.Vector3(SLOT_VIEW_DISTANCE, 0, 0)),
     };
-    const centres: Record<Focus, THREE.Vector3> = { screen: screenCentre, paper: paperCentre, diplomas: capCentre };
+    const centres: Record<Focus, THREE.Vector3> = {
+      screen: screenCentre,
+      paper: paperCentre,
+      diplomas: capCentre,
+      mailbox: slotCentre,
+    };
     const aim = new THREE.Vector3();
 
     const computePoses = () => {
@@ -778,12 +891,45 @@ export function Bedroom() {
     let windowAt = 0;
     let windowTarget = 0;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The pen: whether its tip is out, and the click going on (1 = settled). `penAfter` runs once a click ends.
+    let penOpen = false;
+    let penWasOpen = false;
+    let penPhase = 1;
+    let penAfter: (() => void) | null = null;
+    let penQueued: { open: boolean; after?: () => void } | null = null;
+    const clickPen = (open: boolean, after?: () => void) => {
+      if (penPhase < 1) {
+        penQueued = { open, after };
+        return;
+      }
+      if (open === penOpen) {
+        after?.();
+        return;
+      }
+      penWasOpen = penOpen;
+      penOpen = open;
+      penPhase = 0;
+      penAfter = after ?? null;
+    };
+    const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+    const applyPen = () => {
+      const restFrom = penWasOpen ? 0 : 1;
+      const restTo = penOpen ? 0 : 1;
+      const plunger =
+        penPhase < PEN_PRESS_SHARE
+          ? THREE.MathUtils.lerp(restFrom, PEN_PRESS_DEPTH, easeInOut(penPhase / PEN_PRESS_SHARE))
+          : THREE.MathUtils.lerp(PEN_PRESS_DEPTH, restTo, easeInOut((penPhase - PEN_PRESS_SHARE) / (1 - PEN_PRESS_SHARE)));
+      // The tip snaps at the catch, right at the bottom of the press.
+      const flipped = THREE.MathUtils.smoothstep(penPhase, PEN_PRESS_SHARE - 0.04, PEN_PRESS_SHARE + 0.08);
+      posePen(plunger, penOpen ? flipped : 1 - flipped);
+    };
 
     const applyCamera = () => {
       const e = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
       // Geometric travel: the distance shrinks ~40x, so equal steps would rush the end.
-      // The cap's side ends a few centimetres away: a much longer way down, so a steeper curve.
-      const k = focusOn === "diplomas" ? 300 : 40;
+      // The cap's side and the letter box's slot end a few centimetres away: a much longer way down, so a
+      // steeper curve.
+      const k = focusOn === "diplomas" || focusOn === "mailbox" ? 300 : 40;
       const remaining = (Math.pow(k, 1 - e) - 1) / (k - 1);
       const onScreen = focusOn === "screen";
       camera.position.copy(near[focusOn]).lerp(far.position, remaining);
@@ -828,7 +974,9 @@ export function Bedroom() {
       const dt = now - last;
       last = now;
       if (dirty) renderer.shadowMap.needsUpdate = true;
-      if (outside.animate && !reduceMotion && inView && progress < 1 && now - outsideAt >= OUTSIDE_FRAME_MS) {
+      // The outdoors holds still while the intro zooms into the page: the room is one fixed picture meanwhile.
+      const introPlaying = document.documentElement.dataset.intro === "play";
+      if (outside.animate && !reduceMotion && inView && !introPlaying && progress < 1 && now - outsideAt >= OUTSIDE_FRAME_MS) {
         outsideAt = now;
         outside.animate(now / 1000);
         dirty = true;
@@ -837,7 +985,35 @@ export function Bedroom() {
         const step = reduceMotion ? 1 : dt / ZOOM_MS;
         progress = target > progress ? Math.min(target, progress + step) : Math.max(target, progress - step);
         dirty = true;
-        if (progress === target) setMode(target === 1 ? "inside" : "room");
+        if (progress === target) {
+          setMode(target === 1 ? "inside" : "room");
+          // Down on the CV, the pen clicks open as if its top had just been pressed.
+          if (target === 1 && focusOn === "paper") clickPen(true);
+        }
+      }
+      if (penPhase < 1) {
+        penPhase = reduceMotion ? 1 : Math.min(1, penPhase + dt / PEN_CLICK_MS);
+        applyPen();
+        dirty = true;
+        if (penPhase === 1) {
+          const after = penAfter;
+          penAfter = null;
+          after?.();
+          const queued = penQueued;
+          penQueued = null;
+          if (queued) clickPen(queued.open, queued.after);
+        }
+      }
+      for (const [lang, move] of flagMoves) {
+        move.t = reduceMotion ? 1 : Math.min(1, move.t + dt / FLAG_SWAP_MS);
+        const e = easeInOut(move.t);
+        const slot = flags.slots[slotOf[lang]];
+        const flag = flags.flags[lang];
+        flag.position.lerpVectors(move.position, slot.position, e);
+        flag.position.y += Math.sin(Math.PI * e) * move.lift; // lifted clear of the cup and the stand on the way
+        flag.quaternion.slerpQuaternions(move.quaternion, slot.quaternion, e);
+        if (move.t === 1) flagMoves.delete(lang);
+        dirty = true;
       }
       if (windowAt !== windowTarget) {
         const step = reduceMotion ? 1 : dt / WINDOW_SWING_MS;
@@ -865,8 +1041,14 @@ export function Bedroom() {
       },
       leave: () => {
         if (target === 0) return;
-        target = 0;
-        setMode("leaving");
+        const goBack = () => {
+          if (target === 0) return;
+          target = 0;
+          setMode("leaving");
+        };
+        // From the CV, the pen clicks shut first, then the camera pulls back.
+        if (focusOn === "paper" && (penOpen || penPhase < 1)) clickPen(false, goBack);
+        else goBack();
       },
       toggleWindow: () => {
         windowTarget = windowTarget === 1 ? 0 : 1;
@@ -879,18 +1061,41 @@ export function Bedroom() {
       [setup.hit, "screen"],
       [paper.sheet, "paper"],
     ];
-    // Any part of the cap or of either diploma.
+    // Any part of the cap or of either diploma; the USB key leads to the paper too.
     const groups: [THREE.Object3D, Focus | "window"][] = [
       [shelf.group, "diplomas"],
+      [usbKey.usb, "paper"],
+      [letterBox.group, "mailbox"],
       [casement.group, "window"],
     ];
     // What is under the pointer: the monitor, the paper, the cap and diplomas, or any part of the window.
-    const pick = (event: PointerEvent | MouseEvent): Focus | "window" | null => {
+    const pick = (event: PointerEvent | MouseEvent): Focus | "window" | Lang | null => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
-      const candidates = [...targets.map(([object]) => object), ...groups.map(([object]) => object)];
-      const hit = raycaster.intersectObjects(candidates, true)[0];
+      const candidates = [...targets.map(([object]) => object), ...groups.map(([object]) => object), flags.group];
+      const hits = raycaster.intersectObjects(candidates, true);
+      // Each flag's click area is much wider than its cloth, and the cup's two overlap where they cross: of the
+      // flags under the pointer, the one whose cloth centre is nearest on screen takes the click.
+      const flagOf = (object: THREE.Object3D): THREE.Object3D | null => {
+        for (let node: THREE.Object3D | null = object; node; node = node.parent) if (node.userData.lang) return node;
+        return null;
+      };
+      const flagHits = hits.map(({ object }) => flagOf(object)).filter((flag) => flag !== null);
+      if (flagHits.length) {
+        const onScreen = (flag: THREE.Object3D) =>
+          (flag.userData.centre as THREE.Object3D).getWorldPosition(new THREE.Vector3()).project(camera);
+        const nearest = flagHits.reduce((best, flag) => {
+          const a = onScreen(flag);
+          const b = onScreen(best);
+          return Math.hypot(a.x - pointer.x, (a.y - pointer.y) / camera.aspect) <
+            Math.hypot(b.x - pointer.x, (b.y - pointer.y) / camera.aspect)
+            ? flag
+            : best;
+        });
+        return nearest.userData.lang as Lang;
+      }
+      const hit = hits[0];
       if (!hit) return null;
       const focus = targets.find(([object]) => object === hit.object)?.[1];
       if (focus) return focus;
@@ -900,13 +1105,29 @@ export function Bedroom() {
       }
       return null;
     };
-    const onMove = (event: PointerEvent) => setHover(target === 0 && progress === 0 && pick(event) !== null);
+    // Once down on the paper, the USB key is the one thing to click: it saves the CV.
+    const onUsb = (event: PointerEvent | MouseEvent) => {
+      if (!(target === 1 && progress === 1 && focusOn === "paper")) return false;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster.intersectObject(usbKey.usb, true).length > 0;
+    };
+    const onMove = (event: PointerEvent) =>
+      setHover((target === 0 && progress === 0 && pick(event) !== null) || onUsb(event));
     const onClick = (event: MouseEvent) => {
+      if (onUsb(event)) {
+        saveResume();
+        return;
+      }
       const which = target === 0 ? pick(event) : null;
-      if (which === "window") {
+      if (which && (LANGS as readonly string[]).includes(which)) {
+        if (progress === 0) setLanguage(which as Lang);
+      }
+      else if (which === "window") {
         if (progress === 0) controlsRef.current?.toggleWindow();
       }
-      else if (which) controlsRef.current?.enter(which);
+      else if (which) controlsRef.current?.enter(which as Focus);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") controlsRef.current?.leave();
@@ -914,11 +1135,14 @@ export function Bedroom() {
     renderer.domElement.addEventListener("pointermove", onMove);
     renderer.domElement.addEventListener("click", onClick);
     window.addEventListener("keydown", onKey);
+    const stopLanguage = subscribeLanguage(swapFlags);
 
     return () => {
       disposed = true;
       setup.textures.forEach((texture) => texture.dispose());
       paper.texture.dispose();
+      usbKey.texture.dispose();
+      letterBox.texture.dispose();
       reflections.dispose();
       for (const layer of [setup.display, setup.displayPage]) (layer.material as THREE.MeshBasicMaterial).map?.dispose();
       cancelAnimationFrame(frame);
@@ -926,6 +1150,8 @@ export function Bedroom() {
       visibility.disconnect();
       barObserver.disconnect();
       window.removeEventListener("keydown", onKey);
+      stopLanguage();
+      flags.textures.forEach((texture) => texture.dispose());
       controlsRef.current = null;
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
@@ -938,6 +1164,10 @@ export function Bedroom() {
     };
   }, []);
 
+  const language = useLanguage();
+  const t = strings[language];
+  useDocumentTitle(t.title);
+
   const leave = useCallback(() => controlsRef.current?.leave(), []);
   const enterScreen = useCallback(() => controlsRef.current?.enter("screen"), []);
   const enterPaper = useCallback(() => controlsRef.current?.enter("paper"), []);
@@ -945,6 +1175,8 @@ export function Bedroom() {
   const inScreen = mode === "inside" && focus === "screen";
   const inPaper = mode === "inside" && focus === "paper";
   const inDiplomas = mode === "inside" && focus === "diplomas";
+  const enterMailbox = useCallback(() => controlsRef.current?.enter("mailbox"), []);
+  const inMailbox = mode === "inside" && focus === "mailbox";
 
   return (
     <div className="room fixed inset-0 z-40 overflow-hidden">
@@ -957,14 +1189,38 @@ export function Bedroom() {
         }`}
       >
         <button type="button" onClick={enterScreen} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          Click the screen to open it
+          {t.openScreen}
         </button>
         <button type="button" onClick={enterPaper} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          Click the paper to read my resume
+          {t.readResume}
         </button>
         <button type="button" onClick={enterDiplomas} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          Click the diplomas to see my education
+          {t.seeEducation}
         </button>
+        <button type="button" onClick={enterMailbox} disabled={mode !== "room"} className={ROOM_BUTTON}>
+          {t.writeToMe}
+        </button>
+      </div>
+
+      {/* Keyboard and screen-reader route to the flags on the shelf. */}
+      <div
+        role="group"
+        aria-label={t.language}
+        className="sr-only top-4 left-4 flex gap-2 focus-within:not-sr-only focus-within:absolute"
+      >
+        {FLAG_ORDER.toReversed().map((lang) => (
+          <button
+            key={lang}
+            type="button"
+            lang={lang}
+            onClick={() => setLanguage(lang)}
+            disabled={mode !== "room"}
+            aria-pressed={language === lang}
+            className={ROOM_BUTTON}
+          >
+            {t.languageNames[lang]}
+          </button>
+        ))}
       </div>
 
       <div
@@ -976,7 +1232,8 @@ export function Bedroom() {
 
       <div
         aria-hidden={!inPaper}
-        className={`absolute inset-0 transition-opacity duration-300 ${inPaper ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        // Clicks fall through to the scene, where the USB key is; the overlay's own controls take theirs back.
+        className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${inPaper ? "opacity-100" : "opacity-0"}`}
       >
         <ResumePaper active={inPaper} onLeave={leave} />
       </div>
@@ -986,6 +1243,13 @@ export function Bedroom() {
         className={`absolute inset-0 transition-opacity duration-500 ${inDiplomas ? "opacity-100" : "pointer-events-none opacity-0"}`}
       >
         <EducationTimeline active={inDiplomas} onLeave={leave} />
+      </div>
+
+      <div
+        inert={!inMailbox}
+        className={`absolute inset-0 transition-opacity duration-500 ${inMailbox ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      >
+        <ContactBox onLeave={leave} />
       </div>
     </div>
   );

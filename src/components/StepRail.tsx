@@ -11,7 +11,7 @@ interface RailStep {
  * The five steps as a rail that follows the reader: it stays in view and
  * marks the step currently being read.
  */
-export function StepRail({ steps }: { steps: RailStep[] }) {
+export function StepRail({ steps, label }: { steps: RailStep[]; label: string }) {
   const [active, setActive] = useState(steps[0]?.id);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function StepRail({ steps }: { steps: RailStep[] }) {
 
   return (
     <nav
-      aria-label="Steps of this project"
+      aria-label={label}
       className="sticky top-0 z-10 -mx-5 border-b border-line bg-paper/95 px-5 py-3 backdrop-blur sm:-mx-8 sm:px-8 lg:top-8 lg:mx-0 lg:self-start lg:border-b-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
     >
       <ol className="flex items-center gap-1.5 overflow-x-auto lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-visible">

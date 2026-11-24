@@ -1,4 +1,7 @@
+"use client";
+
 import { NoteText } from "@/components/NoteText";
+import { useT } from "@/i18n/useT";
 import { profile } from "@/data/profile";
 import { resume, type ResumeEntry } from "@/data/resume";
 
@@ -10,6 +13,19 @@ export const A4_ASPECT = 210 / 297;
  * src/data/resume.ts in over it.
  */
 const SHOW_PAGE = false;
+
+/** The CV the USB key on the desk hands over, and the name it is saved under. */
+export const RESUME_PDF = { href: "/cv/Alan_Fresco_CV.pdf", fileName: "Alan_Fresco_CV.pdf" };
+
+/** Asks the browser to save the CV PDF on the visitor's computer. */
+export function saveResume() {
+  const link = document.createElement("a");
+  link.href = RESUME_PDF.href;
+  link.download = RESUME_PDF.fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 
 function Section({
   title,
@@ -54,14 +70,15 @@ export function ResumePaper({
   active: boolean;
   onLeave: () => void;
 }) {
+  const t = useT();
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center ${SHOW_PAGE ? "bg-ink/10" : ""}`}
+      className={`absolute inset-0 flex items-center justify-center ${SHOW_PAGE ? `bg-ink/10 ${active ? "pointer-events-auto" : ""}` : ""}`}
       onClick={SHOW_PAGE ? onLeave : undefined}
     >
       {SHOW_PAGE && (
         <article
-          aria-label="Resume"
+          aria-label={t.resume}
           onClick={(event) => event.stopPropagation()}
           className="max-h-[92%] overflow-y-auto bg-[#fbfaf6] px-[7%] py-[6%] text-ink shadow-2xl"
           style={{
@@ -82,22 +99,22 @@ export function ResumePaper({
             </p>
           </header>
 
-          <Section title="Experience">
+          <Section title={t.experience}>
             {resume.experience.map((entry, i) => (
               <Entry key={i} entry={entry} />
             ))}
           </Section>
-          <Section title="Education">
+          <Section title={t.education}>
             {resume.education.map((entry, i) => (
               <Entry key={i} entry={entry} />
             ))}
           </Section>
-          <Section title="Skills">
+          <Section title={t.skills}>
             <p>
               <NoteText note={resume.skills} />
             </p>
           </Section>
-          <Section title="Languages">
+          <Section title={t.languages}>
             <p>
               <NoteText note={resume.languages} />
             </p>
@@ -105,13 +122,23 @@ export function ResumePaper({
         </article>
       )}
 
+      {/* The same as clicking the USB key, for the keyboard and for screens too narrow to show the key. */}
+      <a
+        href={RESUME_PDF.href}
+        download={RESUME_PDF.fileName}
+        tabIndex={active ? 0 : -1}
+        className={`${active ? "pointer-events-auto" : ""} absolute bottom-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
+      >
+        {t.saveCv}
+      </a>
+
       <button
         type="button"
         onClick={onLeave}
         tabIndex={active ? 0 : -1}
-        className="absolute right-5 bottom-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white"
+        className={`${active ? "pointer-events-auto" : ""} absolute right-5 bottom-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
       >
-        ← Back to the room <span className="opacity-60">(Esc)</span>
+        ← {t.backToRoom} <span className="opacity-60">(Esc)</span>
       </button>
     </div>
   );

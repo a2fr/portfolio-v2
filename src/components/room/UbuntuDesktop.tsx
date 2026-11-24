@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { BAR_COLOR, BAR_PX, DOCK_COLOR, DOCK_PX, wallpaperCssUrl } from "./desktopArt";
+import { BAR_COLOR, BAR_PX, DOCK_APPS, DOCK_COLOR, DOCK_PX, DOCK_SEPARATOR_COLOR, type DockAppId, dockIconBox, dockSeparatorBox, wallpaperCssUrl } from "./desktopArt";
+import { AppWindow } from "./AppWindow";
+import { LOCALE, getLanguage, subscribeLanguage as subscribeSiteLanguage, useLanguage } from "@/i18n/language";
+import { strings } from "@/i18n/strings";
 
 export const OWNER_NAME = "Alan Fresco";
 const WALLPAPER = wallpaperCssUrl();
 
-/** Date and time the way the GNOME top bar writes them, in the visitor's locale: "Nov 22  11:15". */
+/** Date and time the way the GNOME top bar writes them, in the site's language: "22 Nov  11:15". */
 export function formatClock(date: Date) {
-  const day = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const locale = LOCALE[getLanguage()];
+  const day = date.toLocaleDateString(locale, { month: "short", day: "numeric" });
+  const time = date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   return `${day}  ${time}`;
 }
 
@@ -18,9 +22,14 @@ const subscribeClock = (notify: () => void) => {
   return () => window.clearInterval(id);
 };
 
-const subscribeLanguage = (notify: () => void) => {
-  window.addEventListener("languagechange", notify);
-  return () => window.removeEventListener("languagechange", notify);
+/** The clock ticks every second and is rewritten in the new language as soon as it changes. */
+const subscribeClockOrLanguage = (notify: () => void) => {
+  const stopClock = subscribeClock(notify);
+  const stopLanguage = subscribeSiteLanguage(notify);
+  return () => {
+    stopClock();
+    stopLanguage();
+  };
 };
 
 const subscribeOnline = (notify: () => void) => {
@@ -109,20 +118,19 @@ function PowerIcon({ className = "h-4 w-4" }: { className?: string }) {
 
 /** Ubuntu-style desktop shown full page once the camera is inside the laptop screen. */
 export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: () => void }) {
-  const clock = useSyncExternalStore(subscribeClock, () => formatClock(new Date()), () => "");
-  const language = useSyncExternalStore(subscribeLanguage, () => navigator.language, () => "en");
+  const language = useLanguage();
+  const t = strings[language];
+  const clock = useSyncExternalStore(subscribeClockOrLanguage, () => formatClock(new Date()), () => "");
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const battery = useBattery();
   const percent = battery ? `${Math.round(battery.level * 100)}%` : null;
   const [menuOpen, setMenuOpen] = useState(false);
-  const [powerOpen, setPowerOpen] = useState(false);
+  const [openApp, setOpenApp] = useState<DockAppId | null>(null);
+  const separator = dockSeparatorBox();
   const trayRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const closeMenu = () => {
-    setMenuOpen(false);
-    setPowerOpen(false);
-  };
+  const closeMenu = () => setMenuOpen(false);
   const shutDown = () => {
     closeMenu();
     onLeave();
@@ -132,7 +140,10 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
   const [wasActive, setWasActive] = useState(active);
   if (wasActive !== active) {
     setWasActive(active);
-    if (!active) closeMenu();
+    if (!active) {
+      closeMenu();
+      setOpenApp(null);
+    }
   }
 
   useEffect(() => {
@@ -168,7 +179,7 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
           {clock}
         </time>
         <div className="flex items-center gap-3">
-          <span data-bar-item title={`Language: ${language}`}>{language.split("-")[0].toLowerCase()}</span>
+          <span data-bar-item title={`${t.language}: ${t.languageNames[language]}`}>{language}</span>
           <button
             ref={trayRef}
             type="button"
@@ -176,20 +187,20 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
             tabIndex={active ? 0 : -1}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label="System menu"
+            aria-label={t.systemMenu}
             className={`-my-1 flex items-center gap-3 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menuOpen ? "bg-white/20" : ""}`}
           >
-            <span data-bar-item className="flex" title={online ? "Connected" : "Offline"} role="img" aria-label={online ? "Network: connected" : "Network: offline"}>
+            <span data-bar-item className="flex" title={online ? t.connected : t.offline} role="img" aria-label={online ? t.networkConnected : t.networkOffline}>
               <NetworkIcon online={online} />
             </span>
-            <span data-bar-item className="flex" role="img" aria-label="Sound">
+            <span data-bar-item className="flex" role="img" aria-label={t.sound}>
               <SoundIcon />
             </span>
             <span
               className="flex items-center gap-1"
-              title={percent ? `Battery: ${percent}${battery?.charging ? ", charging" : ""}` : "Battery"}
+              title={percent ? `${t.battery}: ${percent}${battery?.charging ? `, ${t.charging}` : ""}` : t.battery}
               role="img"
-              aria-label={percent ? `Battery: ${percent}` : "Battery"}
+              aria-label={percent ? `${t.battery}: ${percent}` : t.battery}
             >
               <span data-bar-item className="flex">
                 <BatteryIcon battery={battery} />
@@ -204,63 +215,59 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
         </div>
       </header>
 
-      {/* Dock: empty for now. */}
-      <nav aria-label="Dock" className="absolute bottom-0 left-0" style={{ background: DOCK_COLOR, top: BAR_PX, width: DOCK_PX }} />
+      {/* Dock. Icons sit where the 3D display draws them, so the zoom lands on the same picture. */}
+      <nav aria-label={t.dock} className="absolute bottom-0 left-0" style={{ background: DOCK_COLOR, top: BAR_PX, width: DOCK_PX }} />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute rounded-full"
+        style={{ left: separator.x, top: separator.y, width: separator.width, height: separator.height, background: DOCK_SEPARATOR_COLOR }}
+      />
+      {DOCK_APPS.map((app, index) => {
+        const box = dockIconBox(index);
+        const running = openApp === app.id;
+        return (
+          <button
+            key={app.id}
+            type="button"
+            onClick={() => setOpenApp(running ? null : app.id)}
+            tabIndex={active ? 0 : -1}
+            aria-label={app.name}
+            aria-pressed={running}
+            title={app.name}
+            className="group absolute rounded-xl focus-visible:outline-white"
+            style={{ left: box.x, top: box.y, width: box.size, height: box.size }}
+          >
+            <span className="absolute -inset-1 rounded-xl bg-white/0 transition-colors group-hover:bg-white/15" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={app.icon} alt="" draggable={false} className="relative h-full w-full" />
+            {running && <span className="absolute top-1/2 -left-[7px] h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#e95420]" />}
+          </button>
+        );
+      })}
 
-      {/* System menu, like GNOME's quick settings under the status icons. */}
+      {openApp && <AppWindow key={openApp} app={openApp} onClose={() => setOpenApp(null)} />}
+
+      {/* System menu under the status icons: only the power button, which leaves the screen. */}
       {menuOpen && (
         <div
           ref={menuRef}
           role="menu"
-          aria-label="System menu"
-          className="absolute right-2 z-20 w-72 rounded-2xl bg-[#2b2b2b] p-3 text-[13px] font-medium shadow-2xl ring-1 ring-white/10"
+          aria-label={t.systemMenu}
+          className="absolute right-2 z-20 w-60 rounded-2xl bg-[#2b2b2b] p-1.5 text-[13px] font-medium shadow-2xl ring-1 ring-white/10"
           style={{ top: BAR_PX + 6 }}
         >
-          <div className="mb-3 flex items-center justify-between px-1">
-            <span className="flex items-center gap-2 text-white/80">
-              <BatteryIcon battery={battery} />
-              {percent ?? "Battery"}
-            </span>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => setPowerOpen((open) => !open)}
-              aria-expanded={powerOpen}
-              aria-label="Power options"
-              title="Power Off / Log Out"
-              className={`flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/20 focus-visible:outline-white ${powerOpen ? "bg-white/20" : "bg-white/10"}`}
-            >
+          <button
+            type="button"
+            role="menuitem"
+            autoFocus
+            onClick={shutDown}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
               <PowerIcon />
-            </button>
-          </div>
-
-          {powerOpen ? (
-            <div className="rounded-xl bg-white/5 p-1">
-              <p className="flex items-center gap-2 px-3 pt-2 pb-1 text-[12px] font-semibold text-white/60">
-                <PowerIcon className="h-3.5 w-3.5" /> Power Off
-              </p>
-              <button
-                type="button"
-                role="menuitem"
-                autoFocus
-                onClick={shutDown}
-                className="block w-full rounded-lg px-3 py-2 text-left hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none"
-              >
-                Power Off…
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center gap-2 rounded-full bg-[#e95420] px-3 py-2.5">
-                <NetworkIcon online={online} />
-                <span className="truncate">{online ? "Wi-Fi" : "Offline"}</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2.5">
-                <SoundIcon />
-                <span className="truncate">Sound</span>
-              </div>
-            </div>
-          )}
+            </span>
+            {t.backToBedroom}
+          </button>
         </div>
       )}
     </div>
