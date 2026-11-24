@@ -61,12 +61,17 @@ export const profile = {
     {
       school: fact("Lycée Jean-Baptiste Say, Paris"),
       degree: fact({
-        en: "Baccalauréat, then PTSI / PT* preparatory classes",
-        fr: "Baccalauréat, puis classes préparatoires PTSI / PT*",
-        fil: "Baccalauréat, pagkatapos ay PTSI / PT* preparatory classes",
+        en: "Scientific baccalauréat (S-SI), then PTSI / PT* preparatory classes",
+        fr: "Baccalauréat S-SI, puis classes préparatoires PTSI / PT*",
+        fil: "Scientific baccalauréat (S-SI), pagkatapos ay PTSI / PT* preparatory classes",
       }),
-      period: todo("Years"),
-      detail: todo("One line on what you took from it"),
+      // Terminale S-SI (2019 – 2020), then two years of scientific prépa (2020 – 2022) before ENSEEIHT.
+      period: fact("2019 – 2022"),
+      detail: fact({
+        en: "Engineering sciences option · Physics, technology and engineering sciences prépa",
+        fr: "Option sciences de l'ingénieur · Prépa physique, technologie et sciences de l'ingénieur",
+        fil: "Opsyon sa engineering sciences · Prépa sa physics, technology at engineering sciences",
+      }),
       seal: "inverse",
     },
   ] satisfies EducationEntry[],

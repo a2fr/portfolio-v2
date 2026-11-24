@@ -189,6 +189,41 @@ html[data-intro="play"] #site {
   background-color: #050504;
 }
 
+/* Newcomer guide over the bedroom: the gold of the dusk glow, brightened just enough to read. */
+.room-guide {
+  --guide-gold: rgb(201 160 88);
+}
+
+.room-guide-label {
+  background: rgb(16 14 10 / 0.55);
+  border: 1px solid rgb(150 112 52 / 0.55);
+  box-shadow: inset 0 1px 0 rgb(201 160 88 / 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.room-guide-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: room-guide-pulse 2.8s ease-out infinite;
+}
+
+@keyframes room-guide-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-guide-pulse {
+    animation: none;
+  }
+}
+
 /* Education timeline: the tassel at the end of the cap's cord swings gently from its knot. */
 .tassel-sway {
   transform-origin: 50% 0;

@@ -20,6 +20,7 @@ import { ContactBox } from "./ContactBox";
 import { LANGS, type Lang, getLanguage, setLanguage, subscribeLanguage, useLanguage } from "@/i18n/language";
 import { strings } from "@/i18n/strings";
 import { useDocumentTitle } from "@/i18n/useDocumentTitle";
+import { type GuideLayout, RoomGuide, UsbGuide, guideFits, usbGuideFits } from "./RoomGuide";
 
 const ROOM = 4; // floor side, in metres
 const WALL_HEIGHT = 2.8;
@@ -601,6 +602,7 @@ export function Bedroom() {
   const [mode, setMode] = useState<Mode>("room");
   const [focus, setFocus] = useState<Focus>("screen");
   const [hover, setHover] = useState(false);
+  const [guide, setGuide] = useState<GuideLayout | null>(null);
   const controlsRef = useRef<{ enter: (which: Focus) => void; leave: () => void; toggleWindow: () => void } | null>(
     null,
   );
@@ -942,6 +944,70 @@ export function Bedroom() {
       setup.displayPage.visible = pageLayer.opacity > 0 && pageLayer.map !== null;
     };
 
+    // The newcomer guide: where each key point lands on screen from the resting camera.
+    const guideCamera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 80);
+    const guideBox = new THREE.Box3();
+    const corner = new THREE.Vector3();
+    const layoutGuide = (width: number, height: number) => {
+      guideCamera.aspect = camera.aspect;
+      guideCamera.updateProjectionMatrix();
+      guideCamera.position.copy(far.position);
+      guideCamera.lookAt(roomCentre);
+      guideCamera.updateMatrixWorld();
+      const toScreen = (v: THREE.Vector3) => {
+        v.project(guideCamera);
+        return { x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height };
+      };
+      // A point a fraction of the way in from the object's left edge on screen, level with its middle.
+      const anchorOf = (object: THREE.Object3D, along = 0.2) => {
+        guideBox.setFromObject(object);
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        for (let i = 0; i < 8; i++) {
+          corner.set(
+            i & 1 ? guideBox.max.x : guideBox.min.x,
+            i & 2 ? guideBox.max.y : guideBox.min.y,
+            i & 4 ? guideBox.max.z : guideBox.min.z,
+          );
+          const p = toScreen(corner);
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y);
+        }
+        const { y } = toScreen(guideBox.getCenter(corner));
+        return { x: minX + (maxX - minX) * along, y, top: minY };
+      };
+      let roomLeft = Infinity;
+      for (let i = 0; i < 8; i++) {
+        corner.set(i & 1 ? ROOM : 0, i & 2 ? WALL_HEIGHT : -0.4, i & 4 ? ROOM : 0);
+        roomLeft = Math.min(roomLeft, toScreen(corner).x);
+      }
+      const anchors = {
+        paper: anchorOf(paper.sheet),
+        screen: anchorOf(setup.display),
+        diplomas: anchorOf(shelf.group),
+        flags: anchorOf(flags.group),
+        mailbox: anchorOf(letterBox.group),
+      };
+      // The USB key, seen from where the camera ends up over the CV.
+      guideCamera.position.copy(near.paper);
+      guideCamera.lookAt(paperCentre);
+      guideCamera.updateMatrixWorld();
+      // The key's real tip: its highest vertex on screen, so the leader starts right on the plug.
+      const usb = { x: 0, y: Infinity };
+      usbKey.usb.updateMatrixWorld(true);
+      usbKey.usb.traverse((part) => {
+        if (!(part instanceof THREE.Mesh)) return;
+        const positions = part.geometry.getAttribute("position");
+        for (let i = 0; i < positions.count; i++) {
+          const p = toScreen(corner.fromBufferAttribute(positions, i).applyMatrix4(part.matrixWorld));
+          if (p.y < usb.y) Object.assign(usb, p);
+        }
+      });
+      setGuide({ width, height, roomLeft, anchors, usb });
+    };
+
     const resize = () => {
       const { clientWidth, clientHeight } = host;
       if (!clientWidth || !clientHeight) return;
@@ -949,6 +1015,7 @@ export function Bedroom() {
       camera.aspect = clientWidth / clientHeight;
       camera.updateProjectionMatrix();
       computePoses();
+      layoutGuide(clientWidth, clientHeight);
       paintScreen();
       dirty = true;
     };
@@ -1182,11 +1249,14 @@ export function Bedroom() {
     <div className="room fixed inset-0 z-40 overflow-hidden">
       <div ref={hostRef} className="absolute inset-0" style={{ cursor: hover ? "pointer" : "default" }} />
 
-      {/* Keyboard and screen-reader routes to the same actions as clicking the monitor or the paper. */}
+      <RoomGuide layout={guide} t={t} visible={mode === "room"} />
+
+      {/* Keyboard and screen-reader routes to the same actions as clicking the monitor or the paper. Where the
+          guide is drawn they stay out of sight until a keyboard reaches them; on narrow screens they are the hint. */}
       <div
         className={`absolute inset-x-4 bottom-8 flex flex-wrap justify-center gap-2 transition-opacity duration-300 ${
           mode === "room" ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        } ${guideFits(guide) ? "sr-only focus-within:not-sr-only focus-within:absolute" : ""}`}
       >
         <button type="button" onClick={enterScreen} disabled={mode !== "room"} className={ROOM_BUTTON}>
           {t.openScreen}
@@ -1235,7 +1305,10 @@ export function Bedroom() {
         // Clicks fall through to the scene, where the USB key is; the overlay's own controls take theirs back.
         className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${inPaper ? "opacity-100" : "opacity-0"}`}
       >
-        <ResumePaper active={inPaper} onLeave={leave} />
+        <ResumePaper active={inPaper} onLeave={leave} usbGuide={usbGuideFits(guide)} />
+      </div>
+      <div className="pointer-events-none absolute inset-0">
+        <UsbGuide layout={guide} label={t.downloadCv} visible={inPaper} />
       </div>
 
       <div

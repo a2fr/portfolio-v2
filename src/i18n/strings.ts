@@ -27,6 +27,7 @@ export const strings = {
     caseStudy: "Full case study",
     // CV
     saveCv: "Click the USB key to save my CV",
+    downloadCv: "Download my resume",
     resume: "Resume",
     experience: "Experience",
     education: "Education",
@@ -37,6 +38,14 @@ export const strings = {
     diploma: "Diploma",
     // Letter box
     writeToMe: "Click the letter box to write to me",
+    // Newcomer guide drawn over the room
+    guide: {
+      paper: "Resume",
+      screen: "Experience",
+      diplomas: "Education",
+      flags: "Language",
+      mailbox: "Contact",
+    },
     contact: "Contact",
     contactTitle: "Write to me",
     contactIntro: "Drop a letter in the box: it lands straight in my inbox, and I answer by email.",
@@ -101,6 +110,7 @@ export const strings = {
     logo: "Logo",
     caseStudy: "Étude de cas complète",
     saveCv: "Cliquez sur la clé USB pour enregistrer mon CV",
+    downloadCv: "Télécharger mon CV",
     resume: "CV",
     experience: "Expérience",
     education: "Formation",
@@ -109,6 +119,14 @@ export const strings = {
     myTimeline: "Mon parcours",
     diploma: "Diplôme",
     writeToMe: "Cliquez sur la boîte aux lettres pour m'écrire",
+    // Newcomer guide drawn over the room
+    guide: {
+      paper: "CV",
+      screen: "Expériences",
+      diplomas: "Parcours",
+      flags: "Langue",
+      mailbox: "Contact",
+    },
     contact: "Contact",
     contactTitle: "Écrivez-moi",
     contactIntro: "Glissez une lettre dans la boîte : elle arrive directement dans ma messagerie, et je réponds par e-mail.",
@@ -173,6 +191,7 @@ export const strings = {
     logo: "Logo",
     caseStudy: "Buong case study",
     saveCv: "I-click ang USB key para i-save ang aking CV",
+    downloadCv: "I-download ang CV ko",
     resume: "Resume",
     experience: "Karanasan",
     education: "Edukasyon",
@@ -181,6 +200,14 @@ export const strings = {
     myTimeline: "Ang aking timeline",
     diploma: "Diploma",
     writeToMe: "I-click ang letter box para sumulat sa akin",
+    // Newcomer guide drawn over the room
+    guide: {
+      paper: "Resume",
+      screen: "Karanasan",
+      diplomas: "Pag-aaral",
+      flags: "Wika",
+      mailbox: "Kontak",
+    },
     contact: "Contact",
     contactTitle: "Sumulat sa akin",
     contactIntro: "Maghulog ng liham sa kahon: diretso itong darating sa aking inbox, at sasagot ako sa email.",

@@ -66,9 +66,12 @@ function Entry({ entry }: { entry: ResumeEntry }) {
 export function ResumePaper({
   active,
   onLeave,
+  usbGuide = false,
 }: {
   active: boolean;
   onLeave: () => void;
+  /** The gold label beside the USB key is drawn: the link below then only shows up for the keyboard. */
+  usbGuide?: boolean;
 }) {
   const t = useT();
   return (
@@ -126,8 +129,9 @@ export function ResumePaper({
       <a
         href={RESUME_PDF.href}
         download={RESUME_PDF.fileName}
-        tabIndex={active ? 0 : -1}
-        className={`${active ? "pointer-events-auto" : ""} absolute bottom-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
+        tabIndex={active && !usbGuide ? 0 : -1}
+        aria-hidden={usbGuide}
+        className={`${usbGuide ? "hidden" : ""} ${active ? "pointer-events-auto" : ""} absolute bottom-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
       >
         {t.saveCv}
       </a>
@@ -136,7 +140,7 @@ export function ResumePaper({
         type="button"
         onClick={onLeave}
         tabIndex={active ? 0 : -1}
-        className={`${active ? "pointer-events-auto" : ""} absolute right-5 bottom-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
+        className={`${active ? "pointer-events-auto" : ""} absolute top-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
       >
         ← {t.backToRoom} <span className="opacity-60">(Esc)</span>
       </button>

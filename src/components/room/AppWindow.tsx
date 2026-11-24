@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BAR_PX, DOCK_APPS, DOCK_PX, type DockAppId } from "./desktopArt";
 import { type Lang, useLanguage } from "@/i18n/language";
@@ -427,9 +426,6 @@ export function AppWindow({ app, onClose }: { app: DockAppId; onClose: () => voi
               {copy.linkLabels[i]} ↗
             </a>
           ))}
-          <Link href={`/projects/${content.slug}`} className="rounded-lg bg-white/10 px-4 py-2 hover:bg-white/20">
-            {t.caseStudy}
-          </Link>
         </div>
       </div>
     </div>

@@ -153,7 +153,7 @@ export function ContactBox({ onLeave }: { onLeave: () => void }) {
       <button
         type="button"
         onClick={onLeave}
-        className="fixed right-5 bottom-5 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/20 focus-visible:outline-white"
+        className="fixed top-5 left-5 z-10 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-white/20 focus-visible:outline-white"
       >
         ← {t.backToRoom} <span className="opacity-60">(Esc)</span>
       </button>

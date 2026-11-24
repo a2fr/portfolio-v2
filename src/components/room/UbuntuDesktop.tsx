@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BAR_COLOR, BAR_PX, DOCK_APPS, DOCK_COLOR, DOCK_PX, DOCK_SEPARATOR_COLOR, type DockAppId, dockIconBox, dockSeparatorBox, wallpaperCssUrl } from "./desktopArt";
 import { AppWindow } from "./AppWindow";
-import { LOCALE, getLanguage, subscribeLanguage as subscribeSiteLanguage, useLanguage } from "@/i18n/language";
+import { LANGS, LOCALE, type Lang, getLanguage, setLanguage, subscribeLanguage as subscribeSiteLanguage, useLanguage } from "@/i18n/language";
 import { strings } from "@/i18n/strings";
 
 export const OWNER_NAME = "Alan Fresco";
@@ -124,13 +124,29 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const battery = useBattery();
   const percent = battery ? `${Math.round(battery.level * 100)}%` : null;
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Which top-bar menu is open: the system menu (power) or the language picker.
+  const [menu, setMenu] = useState<"system" | "language" | null>(null);
   const [openApp, setOpenApp] = useState<DockAppId | null>(null);
   const separator = dockSeparatorBox();
   const trayRef = useRef<HTMLButtonElement>(null);
+  const languageRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => setMenu(null);
+  // The language menu hangs under its own indicator, right edges lined up.
+  const [languageMenuRight, setLanguageMenuRight] = useState(0);
+  const toggleMenu = (which: "system" | "language") => {
+    const button = languageRef.current;
+    const bar = button?.offsetParent as HTMLElement | null;
+    if (which === "language" && button && bar) setLanguageMenuRight(bar.clientWidth - button.offsetLeft - button.offsetWidth);
+    setMenu((open) => (open === which ? null : which));
+  };
+  // Same switch as picking a flag in the bedroom: the whole site, the room's flags included, follows it.
+  const chooseLanguage = (lang: Lang) => {
+    closeMenu();
+    setLanguage(lang);
+    languageRef.current?.focus();
+  };
   const shutDown = () => {
     closeMenu();
     onLeave();
@@ -147,17 +163,18 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
   }
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menu) return;
+    const opener = menu === "language" ? languageRef : trayRef;
     const onPointer = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!menuRef.current?.contains(target) && !trayRef.current?.contains(target)) closeMenu();
+      if (!menuRef.current?.contains(target) && !opener.current?.contains(target)) closeMenu();
     };
     // While the menu is open, Esc closes it instead of leaving the screen.
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopImmediatePropagation();
       closeMenu();
-      trayRef.current?.focus();
+      opener.current?.focus();
     };
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey, true);
@@ -165,7 +182,7 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [menuOpen]);
+  }, [menu]);
 
   return (
     <div
@@ -179,16 +196,28 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
           {clock}
         </time>
         <div className="flex items-center gap-3">
-          <span data-bar-item title={`${t.language}: ${t.languageNames[language]}`}>{language}</span>
+          <button
+            ref={languageRef}
+            type="button"
+            onClick={() => toggleMenu("language")}
+            tabIndex={active ? 0 : -1}
+            aria-haspopup="menu"
+            aria-expanded={menu === "language"}
+            aria-label={`${t.language}: ${t.languageNames[language]}`}
+            title={`${t.language}: ${t.languageNames[language]}`}
+            className={`-my-1 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menu === "language" ? "bg-white/20" : ""}`}
+          >
+            <span data-bar-item>{language}</span>
+          </button>
           <button
             ref={trayRef}
             type="button"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => toggleMenu("system")}
             tabIndex={active ? 0 : -1}
             aria-haspopup="menu"
-            aria-expanded={menuOpen}
+            aria-expanded={menu === "system"}
             aria-label={t.systemMenu}
-            className={`-my-1 flex items-center gap-3 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menuOpen ? "bg-white/20" : ""}`}
+            className={`-my-1 flex items-center gap-3 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menu === "system" ? "bg-white/20" : ""}`}
           >
             <span data-bar-item className="flex" title={online ? t.connected : t.offline} role="img" aria-label={online ? t.networkConnected : t.networkOffline}>
               <NetworkIcon online={online} />
@@ -247,8 +276,35 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
 
       {openApp && <AppWindow key={openApp} app={openApp} onClose={() => setOpenApp(null)} />}
 
+      {/* Language picker under the language indicator, like GNOME's input source menu. */}
+      {menu === "language" && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={t.language}
+          className="absolute z-20 w-48 rounded-2xl bg-[#2b2b2b] p-1.5 text-[13px] font-medium shadow-2xl ring-1 ring-white/10"
+          style={{ top: BAR_PX + 6, right: languageMenuRight }}
+        >
+          {LANGS.map((lang) => (
+            <button
+              key={lang}
+              type="button"
+              role="menuitemradio"
+              aria-checked={lang === language}
+              autoFocus={lang === language}
+              onClick={() => chooseLanguage(lang)}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none"
+            >
+              <span className="w-7 text-white/60">{lang}</span>
+              <span className="flex-1">{t.languageNames[lang]}</span>
+              {lang === language && <span aria-hidden>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* System menu under the status icons: only the power button, which leaves the screen. */}
-      {menuOpen && (
+      {menu === "system" && (
         <div
           ref={menuRef}
           role="menu"
