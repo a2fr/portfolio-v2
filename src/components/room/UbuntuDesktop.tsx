@@ -9,12 +9,19 @@ import { strings } from "@/i18n/strings";
 export const OWNER_NAME = "Alan Fresco";
 const WALLPAPER = wallpaperCssUrl();
 
+/** Between the date and the time in the top bar's clock. */
+export const CLOCK_GAP = "  ";
+/** Below this page width the top bar shows the time alone, beside the indicators. */
+export const COMPACT_BAR_PX = 640; // Tailwind's `sm`
+/** In the compact bar: from the end of the time to the first indicator. */
+export const COMPACT_CLOCK_GAP_PX = 12; // the time's margin plus the language button's padding
+
 /** Date and time the way the GNOME top bar writes them, in the site's language: "22 Nov  11:15". */
 export function formatClock(date: Date) {
   const locale = LOCALE[getLanguage()];
   const day = date.toLocaleDateString(locale, { month: "short", day: "numeric" });
   const time = date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-  return `${day}  ${time}`;
+  return `${day}${CLOCK_GAP}${time}`;
 }
 
 const subscribeClock = (notify: () => void) => {
@@ -121,6 +128,7 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
   const language = useLanguage();
   const t = strings[language];
   const clock = useSyncExternalStore(subscribeClockOrLanguage, () => formatClock(new Date()), () => "");
+  const [day, time] = clock.split(CLOCK_GAP);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const battery = useBattery();
   const percent = battery ? `${Math.round(battery.level * 100)}%` : null;
@@ -192,8 +200,10 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
       {/* Top bar */}
       <header data-desktop-bar className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-3 text-[13px] font-semibold" style={{ background: BAR_COLOR, height: BAR_PX }}>
         <span>{OWNER_NAME}</span>
-        <time className="absolute left-1/2 -translate-x-1/2 whitespace-pre" suppressHydrationWarning>
-          {clock}
+        {/* Centred, as on GNOME; on a phone there is no room for that, so the time alone sits by the indicators. */}
+        <time className="whitespace-pre max-sm:mr-0.5 max-sm:ml-auto sm:absolute sm:left-1/2 sm:-translate-x-1/2" suppressHydrationWarning>
+          {day && <span className="max-sm:hidden">{day + CLOCK_GAP}</span>}
+          {time}
         </time>
         <div className="flex items-center gap-3">
           <button
@@ -205,7 +215,7 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
             aria-expanded={menu === "language"}
             aria-label={`${t.language}: ${t.languageNames[language]}`}
             title={`${t.language}: ${t.languageNames[language]}`}
-            className={`-my-1 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menu === "language" ? "bg-white/20" : ""}`}
+            className={`relative -my-1 rounded-full px-2.5 py-1 after:absolute after:inset-x-0 after:-top-1 after:-bottom-3 hover:bg-white/15 focus-visible:outline-white ${menu === "language" ? "bg-white/20" : ""}`}
           >
             <span data-bar-item>{language}</span>
           </button>
@@ -217,7 +227,7 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
             aria-haspopup="menu"
             aria-expanded={menu === "system"}
             aria-label={t.systemMenu}
-            className={`-my-1 flex items-center gap-3 rounded-full px-2.5 py-1 hover:bg-white/15 focus-visible:outline-white ${menu === "system" ? "bg-white/20" : ""}`}
+            className={`relative -my-1 flex items-center gap-3 rounded-full px-2.5 py-1 after:absolute after:inset-x-0 after:-top-1 after:-bottom-3 hover:bg-white/15 focus-visible:outline-white ${menu === "system" ? "bg-white/20" : ""}`}
           >
             <span data-bar-item className="flex" title={online ? t.connected : t.offline} role="img" aria-label={online ? t.networkConnected : t.networkOffline}>
               <NetworkIcon online={online} />
@@ -273,6 +283,22 @@ export function UbuntuDesktop({ active, onLeave }: { active: boolean; onLeave: (
           </button>
         );
       })}
+
+      {/* Phones have no Esc key, and the power button hides in the system menu: a way out at the foot of the dock,
+          where a finger finds it. The 3D display does not draw it, so it stays off screens with a mouse. */}
+      <button
+        type="button"
+        onClick={shutDown}
+        tabIndex={active ? 0 : -1}
+        aria-label={t.backToBedroom}
+        title={t.backToBedroom}
+        className="absolute bottom-3 hidden h-11 w-11 items-center justify-center rounded-full bg-white/15 active:bg-white/30 focus-visible:outline-white max-sm:flex [@media(hover:none)]:flex"
+        style={{ left: (DOCK_PX - 44) / 2 }}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M19 12H5M11 6l-6 6 6 6" />
+        </svg>
+      </button>
 
       {openApp && <AppWindow key={openApp} app={openApp} onClose={() => setOpenApp(null)} />}
 

@@ -28,6 +28,7 @@ export const strings = {
     // CV
     saveCv: "Click the USB key to save my CV",
     downloadCv: "Download my resume",
+    openCv: "Open the PDF to read it",
     resume: "Resume",
     experience: "Experience",
     education: "Education",
@@ -111,6 +112,7 @@ export const strings = {
     caseStudy: "Étude de cas complète",
     saveCv: "Cliquez sur la clé USB pour enregistrer mon CV",
     downloadCv: "Télécharger mon CV",
+    openCv: "Ouvrir le PDF pour le lire",
     resume: "CV",
     experience: "Expérience",
     education: "Formation",
@@ -192,6 +194,7 @@ export const strings = {
     caseStudy: "Buong case study",
     saveCv: "I-click ang USB key para i-save ang aking CV",
     downloadCv: "I-download ang CV ko",
+    openCv: "Buksan ang PDF para basahin",
     resume: "Resume",
     experience: "Karanasan",
     education: "Edukasyon",

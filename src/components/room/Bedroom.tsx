@@ -13,7 +13,7 @@ import { box, buildSetup, matte } from "./deskSetup";
 import { PAD_FONTS } from "./padFonts";
 import { A4_ASPECT, ResumePaper, saveResume } from "./ResumePaper";
 import { EducationTimeline } from "./EducationTimeline";
-import { OWNER_NAME, UbuntuDesktop, formatClock } from "./UbuntuDesktop";
+import { CLOCK_GAP, COMPACT_BAR_PX, COMPACT_CLOCK_GAP_PX, OWNER_NAME, UbuntuDesktop, formatClock } from "./UbuntuDesktop";
 import { type FlagSlot, buildFlagCorner } from "./flags";
 import { buildLetterBox } from "./letterBox";
 import { ContactBox } from "./ContactBox";
@@ -66,6 +66,14 @@ const FLAGS_AT = { x: 0.1, z: 2.08, cup: { x: 0.12, z: -0.52 } };
 /** Time for two flags to swap between the cup and the stand. */
 const FLAG_SWAP_MS = 900;
 
+/** Everything drawn (the room, the outdoors and its sky) lies within this distance of the room's centre. */
+const DEPTH_REACH = 9;
+/** Upright, how much of the view's width (or height) the room takes, edge to edge. */
+const UPRIGHT_FILL = 0.95;
+/** A finger that misses everything still takes what lies within these distances of it, nearest first (CSS pixels). */
+const TOUCH_REACH = [12, 24];
+/** Where the guide has no room (phones, tablets): the same four doors as short, finger-sized buttons. */
+const COMPACT_BUTTON = "min-h-11 rounded-full bg-white/75 px-4 text-sm font-medium text-ink backdrop-blur active:bg-white";
 const ROOM_BUTTON = "rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-ink backdrop-blur hover:bg-white";
 
 /** Chessboard floor: 8 x 8 squares of the chair's green and a lighter tint of it, each with faint streaky grain. */
@@ -611,7 +619,7 @@ export function Bedroom() {
     const host = hostRef.current;
     if (!host) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true }); // stencil: the outdoors mask
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.autoUpdate = false; // nothing that casts a shadow moves: redrawn only on real changes
@@ -690,6 +698,32 @@ export function Bedroom() {
     // What the window looks out on follows the season; it may move (falling snow).
     const outside = buildWindowView(seasonOf(new Date()));
     scene.add(outside.group);
+    // The outdoors is drawn through the window's opening only. Its sky card is sized to hide behind the wall from
+    // one camera distance; from further off (an upright phone) the perspective flattens and it showed over the top.
+    {
+      const { x0, x1, y0, y1 } = WINDOW;
+      const opening = new THREE.Mesh(
+        new THREE.PlaneGeometry(x1 - x0, y1 - y0),
+        new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: false,
+          stencilWrite: true,
+          stencilRef: 1,
+          stencilZPass: THREE.ReplaceStencilOp,
+        }),
+      );
+      opening.position.set((x0 + x1) / 2, (y0 + y1) / 2, -WALL_THICKNESS / 2);
+      opening.renderOrder = -1; // before anything outdoors
+      scene.add(opening);
+      outside.group.traverse((object) => {
+        const material = (object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        for (const m of material ? (Array.isArray(material) ? material : [material]) : []) {
+          m.stencilWrite = true; // turns the test on; the ops all keep what the opening wrote
+          m.stencilRef = 1;
+          m.stencilFunc = THREE.EqualStencilFunc;
+        }
+      });
+    }
 
     const desk = buildDesk();
     desk.group.position.set(0.44, 0, 2);
@@ -759,7 +793,10 @@ export function Bedroom() {
     // Status indicators are copied from the page's own top bar, so both show the same thing in the same place.
     const readBarItems = (): BarItem[] =>
       Array.from(host.parentElement?.querySelectorAll<HTMLElement>("[data-bar-item]") ?? [], (el) => {
-        const place = { x: el.offsetLeft, y: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight };
+        // Measured against the bar itself: the buttons around them are positioned, so offsets would stop there.
+        const box = el.getBoundingClientRect();
+        const bar = el.closest("[data-desktop-bar]")!.getBoundingClientRect();
+        const place = { x: box.left - bar.left, y: box.top - bar.top, width: box.width, height: box.height };
         const icon = el.querySelector("svg");
         return icon
           ? { ...place, svg: icon.innerHTML }
@@ -776,7 +813,7 @@ export function Bedroom() {
       );
     });
 
-    const paintLayer = (layer: THREE.Mesh, view: DesktopView, items: BarItem[], request: number) => {
+    const paintLayer = (layer: THREE.Mesh, view: DesktopView, items: BarItem[], request: number, compact = false) => {
       const image = new Image();
       image.onload = async () => {
         const icons = await Promise.all(dockIcons);
@@ -802,7 +839,12 @@ export function Bedroom() {
         material.needsUpdate = true;
         dirty = true;
       };
-      image.src = desktopImageSrc(texW, texH, view, OWNER_NAME, formatClock(new Date()), items);
+      // A narrow page shows the time alone, ending just before the first indicator.
+      const clock = formatClock(new Date());
+      image.src =
+        compact && items.length
+          ? desktopImageSrc(texW, texH, view, OWNER_NAME, clock.split(CLOCK_GAP)[1], items, items[0].x - COMPACT_CLOCK_GAP_PX)
+          : desktopImageSrc(texW, texH, view, OWNER_NAME, clock, items);
     };
 
     const paintScreen = () => {
@@ -826,7 +868,7 @@ export function Bedroom() {
       const pageAspect = pageWidth / pageHeight;
       const width = Math.min(texW, texH * pageAspect);
       const height = width / pageAspect;
-      paintLayer(setup.displayPage, { x: (texW - width) / 2, y: (texH - height) / 2, width, height, scale: height / pageHeight }, items, request);
+      paintLayer(setup.displayPage, { x: (texW - width) / 2, y: (texH - height) / 2, width, height, scale: height / pageHeight }, items, request, pageWidth < COMPACT_BAR_PX);
     };
 
     // Camera poses: the whole room, and nose-to-screen on the monitor.
@@ -864,12 +906,35 @@ export function Bedroom() {
     };
     const aim = new THREE.Vector3();
 
+    const fitCamera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 80);
+    const fitCorner = new THREE.Vector3();
     const computePoses = () => {
       const aspect = camera.aspect;
       const halfV = THREE.MathUtils.degToRad(FOV / 2);
       const halfH = Math.atan(Math.tan(halfV) * aspect);
 
-      far.position.copy(roomCentre).addScaledVector(viewDir, (roomRadius / Math.sin(Math.min(halfV, halfH))) * 1.02);
+      let distance = (roomRadius / Math.sin(Math.min(halfV, halfH))) * 1.02;
+      // Upright (a phone), the width is all there is: come as close as the room's own corners allow instead of
+      // its looser bounding sphere. Blended in below a square view, so resizing a window never jumps.
+      const upright = THREE.MathUtils.clamp((1 - aspect) / 0.25, 0, 1);
+      if (upright > 0) {
+        let tight = distance;
+        fitCamera.aspect = aspect;
+        fitCamera.updateProjectionMatrix();
+        for (let pass = 0; pass < 4; pass++) {
+          fitCamera.position.copy(roomCentre).addScaledVector(viewDir, tight);
+          fitCamera.lookAt(roomCentre);
+          fitCamera.updateMatrixWorld();
+          let reach = 0;
+          for (let i = 0; i < 8; i++) {
+            fitCorner.set(i & 1 ? ROOM : 0, i & 2 ? WALL_HEIGHT : -0.4, i & 4 ? ROOM : 0).project(fitCamera);
+            reach = Math.max(reach, Math.abs(fitCorner.x), Math.abs(fitCorner.y));
+          }
+          tight *= reach / UPRIGHT_FILL;
+        }
+        distance = THREE.MathUtils.lerp(distance, tight, upright);
+      }
+      far.position.copy(roomCentre).addScaledVector(viewDir, distance);
       // Close enough that the display just covers the viewport: the crop the desktop picture is laid out for.
       const fill = Math.min(
         setup.displaySize.height / (2 * Math.tan(halfV)),
@@ -935,6 +1000,13 @@ export function Bedroom() {
       const remaining = (Math.pow(k, 1 - e) - 1) / (k - 1);
       const onScreen = focusOn === "screen";
       camera.position.copy(near[focusOn]).lerp(far.position, remaining);
+      // The depth range hugs the room. Seen from an upright phone the camera stands some 40 m back, and with the
+      // near plane left at the 2 cm the dives need, depth steps there are millimetres: the sheet flickered into
+      // the desk it lies on.
+      const away = camera.position.distanceTo(roomCentre);
+      camera.near = Math.max(0.02, away - DEPTH_REACH);
+      camera.far = away + DEPTH_REACH;
+      camera.updateProjectionMatrix();
       // Aim at the focus early, so it stays centred for the whole dive.
       camera.lookAt(aim.copy(roomCentre).lerp(centres[focusOn], Math.min(1, e * 3)));
 
@@ -1136,7 +1208,7 @@ export function Bedroom() {
       [casement.group, "window"],
     ];
     // What is under the pointer: the monitor, the paper, the cap and diplomas, or any part of the window.
-    const pick = (event: PointerEvent | MouseEvent): Focus | "window" | Lang | null => {
+    const pick = (event: { clientX: number; clientY: number }): Focus | "window" | Lang | null => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
@@ -1187,7 +1259,19 @@ export function Bedroom() {
         saveResume();
         return;
       }
-      const which = target === 0 ? pick(event) : null;
+      let which = target === 0 ? pick(event) : null;
+      // Seen from the room, the flags, the sheet or the letter box are smaller than a fingertip: a touch that
+      // lands on nothing takes the nearest thing around it.
+      const touch = (event as PointerEvent).pointerType === "touch" || window.matchMedia("(pointer: coarse)").matches;
+      if (target === 0 && !which && touch) {
+        search: for (const reach of TOUCH_REACH) {
+          for (let step = 0; step < 8; step++) {
+            const angle = (step * Math.PI) / 4;
+            which = pick({ clientX: event.clientX + Math.cos(angle) * reach, clientY: event.clientY + Math.sin(angle) * reach });
+            if (which) break search;
+          }
+        }
+      }
       if (which && (LANGS as readonly string[]).includes(which)) {
         if (progress === 0) setLanguage(which as Lang);
       }
@@ -1244,6 +1328,8 @@ export function Bedroom() {
   const inDiplomas = mode === "inside" && focus === "diplomas";
   const enterMailbox = useCallback(() => controlsRef.current?.enter("mailbox"), []);
   const inMailbox = mode === "inside" && focus === "mailbox";
+  // Laid out, and no room for the guide beside the room: a phone or a tablet.
+  const compact = guide !== null && !guideFits(guide);
 
   return (
     <div className="room fixed inset-0 z-40 overflow-hidden">
@@ -1254,29 +1340,38 @@ export function Bedroom() {
       {/* Keyboard and screen-reader routes to the same actions as clicking the monitor or the paper. Where the
           guide is drawn they stay out of sight until a keyboard reaches them; on narrow screens they are the hint. */}
       <div
-        className={`absolute inset-x-4 bottom-8 flex flex-wrap justify-center gap-2 transition-opacity duration-300 ${
-          mode === "room" ? "opacity-100" : "pointer-events-none opacity-0"
-        } ${guideFits(guide) ? "sr-only focus-within:not-sr-only focus-within:absolute" : ""}`}
+        className={`absolute transition-opacity duration-300 ${
+          compact ? "inset-x-4 bottom-6 mx-auto grid max-w-sm grid-cols-2 gap-2" : "inset-x-4 bottom-8 flex flex-wrap justify-center gap-2"
+        } ${mode === "room" ? "opacity-100" : "pointer-events-none opacity-0"} ${
+          guideFits(guide) ? "sr-only focus-within:not-sr-only focus-within:absolute" : ""
+        }`}
       >
-        <button type="button" onClick={enterScreen} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          {t.openScreen}
+        <button type="button" onClick={enterScreen} disabled={mode !== "room"} className={compact ? COMPACT_BUTTON : ROOM_BUTTON}>
+          {compact ? t.guide.screen : t.openScreen}
         </button>
-        <button type="button" onClick={enterPaper} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          {t.readResume}
+        <button type="button" onClick={enterPaper} disabled={mode !== "room"} className={compact ? COMPACT_BUTTON : ROOM_BUTTON}>
+          {compact ? t.guide.paper : t.readResume}
         </button>
-        <button type="button" onClick={enterDiplomas} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          {t.seeEducation}
+        <button type="button" onClick={enterDiplomas} disabled={mode !== "room"} className={compact ? COMPACT_BUTTON : ROOM_BUTTON}>
+          {compact ? t.guide.diplomas : t.seeEducation}
         </button>
-        <button type="button" onClick={enterMailbox} disabled={mode !== "room"} className={ROOM_BUTTON}>
-          {t.writeToMe}
+        <button type="button" onClick={enterMailbox} disabled={mode !== "room"} className={compact ? COMPACT_BUTTON : ROOM_BUTTON}>
+          {compact ? t.guide.mailbox : t.writeToMe}
         </button>
       </div>
 
-      {/* Keyboard and screen-reader route to the flags on the shelf. */}
+      {/* Keyboard and screen-reader route to the flags on the shelf; on a phone, where the flags are a few pixels
+          wide, the visible way to change language. */}
       <div
         role="group"
         aria-label={t.language}
-        className="sr-only top-4 left-4 flex gap-2 focus-within:not-sr-only focus-within:absolute"
+        className={
+          compact
+            ? `absolute inset-x-4 top-4 flex justify-center gap-2 transition-opacity duration-300 ${
+                mode === "room" ? "opacity-100" : "pointer-events-none opacity-0"
+              }`
+            : "sr-only top-4 left-4 flex gap-2 focus-within:not-sr-only focus-within:absolute"
+        }
       >
         {FLAG_ORDER.toReversed().map((lang) => (
           <button
@@ -1286,7 +1381,13 @@ export function Bedroom() {
             onClick={() => setLanguage(lang)}
             disabled={mode !== "room"}
             aria-pressed={language === lang}
-            className={ROOM_BUTTON}
+            className={
+              compact
+                ? `min-h-10 rounded-full px-4 text-sm font-medium backdrop-blur ${
+                    language === lang ? "bg-white/85 text-ink" : "bg-white/15 text-white/85 active:bg-white/30"
+                  }`
+                : ROOM_BUTTON
+            }
           >
             {t.languageNames[lang]}
           </button>
@@ -1305,7 +1406,7 @@ export function Bedroom() {
         // Clicks fall through to the scene, where the USB key is; the overlay's own controls take theirs back.
         className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${inPaper ? "opacity-100" : "opacity-0"}`}
       >
-        <ResumePaper active={inPaper} onLeave={leave} usbGuide={usbGuideFits(guide)} />
+        <ResumePaper active={inPaper} onLeave={leave} usbGuide={usbGuideFits(guide)} compact={compact} />
       </div>
       <div className="pointer-events-none absolute inset-0">
         <UsbGuide layout={guide} label={t.downloadCv} visible={inPaper} />

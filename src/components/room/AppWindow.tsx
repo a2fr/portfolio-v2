@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import { BAR_PX, DOCK_APPS, DOCK_PX, type DockAppId } from "./desktopArt";
 import { type Lang, useLanguage } from "@/i18n/language";
 import { strings } from "@/i18n/strings";
@@ -342,8 +342,9 @@ export function AppWindow({ app, onClose }: { app: DockAppId; onClose: () => voi
     <div
       role="dialog"
       aria-label={content.title}
-      className="absolute z-10 flex flex-col overflow-hidden rounded-xl bg-[#242424] shadow-2xl ring-1 ring-white/10"
-      style={{ top: BAR_PX + 24, bottom: 24, left: DOCK_PX + 24, right: 24, maxWidth: 820, marginInline: "auto" }}
+      // On a phone the window keeps only a thin margin, so the text gets nearly the whole width beside the dock.
+      className="absolute top-[calc(var(--bar)+8px)] right-2 bottom-2 left-[calc(var(--dock)+8px)] z-10 flex flex-col overflow-hidden rounded-xl bg-[#242424] shadow-2xl ring-1 ring-white/10 sm:top-[calc(var(--bar)+24px)] sm:right-6 sm:bottom-6 sm:left-[calc(var(--dock)+24px)]"
+      style={{ "--bar": `${BAR_PX}px`, "--dock": `${DOCK_PX}px`, maxWidth: 820, marginInline: "auto" } as CSSProperties}
     >
       {/* Header bar */}
       <header className="relative flex h-11 shrink-0 items-center justify-center bg-[#303030] px-3 text-[13px] font-semibold">
@@ -357,7 +358,8 @@ export function AppWindow({ app, onClose }: { app: DockAppId; onClose: () => voi
           type="button"
           onClick={onClose}
           aria-label={t.close}
-          className="absolute right-3 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 focus-visible:outline-white"
+          // The ring around it widens what a finger can hit to 44px.
+          className="absolute right-3 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 before:absolute before:-inset-2.5 hover:bg-white/20 focus-visible:outline-white"
         >
           <svg viewBox="0 0 16 16" className="h-3 w-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <path d="M4 4l8 8M12 4l-8 8" />
@@ -365,12 +367,12 @@ export function AppWindow({ app, onClose }: { app: DockAppId; onClose: () => voi
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-7 select-text">
-        <div className="mb-6 flex items-center gap-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 select-text sm:px-8 sm:py-7">
+        <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={icon} alt={`${t.logo} ${content.title}`} className="h-20 w-20 shrink-0" />
+          <img src={icon} alt={`${t.logo} ${content.title}`} className="h-14 w-14 shrink-0 sm:h-20 sm:w-20" />
           <div>
-            <h2 className="text-[28px] leading-tight font-bold">{content.title}</h2>
+            <h2 className="text-2xl leading-tight font-bold sm:text-[28px]">{content.title}</h2>
             <p className="mt-1 text-[15px] text-white/75">{copy.tagline}</p>
           </div>
         </div>

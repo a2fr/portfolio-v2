@@ -158,8 +158,17 @@ const escapeXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, 
  * Whole desktop (wallpaper, top bar, dock) as an image source, for the 3D laptop display.
  * Everything is laid out inside `view` exactly as the full-page desktop lays it out in the page,
  * and bleeds past it to the display's edges, so the end of the zoom and the page coincide.
+ * The clock is centred, unless `clockRight` (CSS pixels, the compact bar of a narrow page) gives where it ends.
  */
-export function desktopImageSrc(width: number, height: number, view: DesktopView, name: string, clock: string, items: BarItem[] = []) {
+export function desktopImageSrc(
+  width: number,
+  height: number,
+  view: DesktopView,
+  name: string,
+  clock: string,
+  items: BarItem[] = [],
+  clockRight?: number,
+) {
   const barBottom = view.y + BAR_PX * view.scale;
   const barMiddle = view.y + (BAR_PX * view.scale) / 2;
   const dockRight = view.x + DOCK_PX * view.scale;
@@ -183,7 +192,7 @@ export function desktopImageSrc(width: number, height: number, view: DesktopView
 <rect x="${view.x + separator.x * view.scale}" y="${view.y + separator.y * view.scale}" width="${separator.width * view.scale}" height="${separator.height * view.scale}" rx="${(separator.height * view.scale) / 2}" fill="${DOCK_SEPARATOR_COLOR}"/>
 <rect width="${width}" height="${barBottom}" fill="${BAR_COLOR}"/>
 <text x="${view.x + BAR_PAD_PX * view.scale}" y="${barMiddle}" ${text}>${escapeXml(name)}</text>
-<text x="${view.x + view.width / 2}" y="${barMiddle}" text-anchor="middle" xml:space="preserve" ${text}>${clock}</text>
+<text x="${clockRight === undefined ? view.x + view.width / 2 : view.x + clockRight * view.scale}" y="${barMiddle}" text-anchor="${clockRight === undefined ? "middle" : "end"}" xml:space="preserve" ${text}>${clock}</text>
 ${status}`;
   return `data:image/svg+xml,${encodeURIComponent(svgDocument(width, height, body))}`;
 }

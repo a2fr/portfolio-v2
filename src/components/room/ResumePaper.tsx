@@ -67,11 +67,14 @@ export function ResumePaper({
   active,
   onLeave,
   usbGuide = false,
+  compact = false,
 }: {
   active: boolean;
   onLeave: () => void;
   /** The gold label beside the USB key is drawn: the link below then only shows up for the keyboard. */
   usbGuide?: boolean;
+  /** A phone or a tablet: the sheet is too small to read, so the way to read it is to open the PDF itself. */
+  compact?: boolean;
 }) {
   const t = useT();
   return (
@@ -125,13 +128,26 @@ export function ResumePaper({
         </article>
       )}
 
+      {/* On a phone the sheet's text is a few pixels tall: the PDF opens in the phone's own viewer, which zooms. */}
+      {compact && (
+        <a
+          href={RESUME_PDF.href}
+          target="_blank"
+          rel="noreferrer"
+          tabIndex={active ? 0 : -1}
+          className={`${active ? "pointer-events-auto" : ""} absolute bottom-6 left-1/2 flex min-h-11 -translate-x-1/2 items-center rounded-full bg-white/90 px-5 text-sm font-medium whitespace-nowrap text-ink shadow-lg backdrop-blur active:bg-white focus-visible:outline-white`}
+        >
+          {t.openCv} ↗
+        </a>
+      )}
+
       {/* The same as clicking the USB key, for the keyboard and for screens too narrow to show the key. */}
       <a
         href={RESUME_PDF.href}
         download={RESUME_PDF.fileName}
-        tabIndex={active && !usbGuide ? 0 : -1}
-        aria-hidden={usbGuide}
-        className={`${usbGuide ? "hidden" : ""} ${active ? "pointer-events-auto" : ""} absolute bottom-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
+        tabIndex={active && !usbGuide && !compact ? 0 : -1}
+        aria-hidden={usbGuide || compact}
+        className={`${usbGuide || compact ? "hidden" : ""} ${active ? "pointer-events-auto" : ""} absolute bottom-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
       >
         {t.saveCv}
       </a>
@@ -142,7 +158,7 @@ export function ResumePaper({
         tabIndex={active ? 0 : -1}
         className={`${active ? "pointer-events-auto" : ""} absolute top-5 left-5 rounded-full bg-black/30 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur hover:bg-black/45 focus-visible:outline-white`}
       >
-        ← {t.backToRoom} <span className="opacity-60">(Esc)</span>
+        ← {t.backToRoom} <span className="opacity-60 [@media(hover:none)]:hidden">(Esc)</span>
       </button>
     </div>
   );
